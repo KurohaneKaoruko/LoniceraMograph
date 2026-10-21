@@ -2,7 +2,7 @@
 
 AI Agent 驱动的 MG（Motion Graphics）动画创作工具。**视频实时预览占据主画面，AI 对话在侧边栏**——用自然语言描述动画，AI 通过工具调用操控项目工作区：写场景 JSON / JS 生成脚本、加载预览、自查错误、迭代修正。
 
-跨平台（Windows / macOS / Linux），基于 Tauri 2，核心逻辑全部在 Rust。
+跨平台（Windows / macOS / Linux），基于 Tauri 2，核心逻辑全部在 Rust。许可证 [MIT](LICENSE)。
 
 ## 功能
 
