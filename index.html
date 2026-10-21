@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoniceraMograph</title>
+    <style>
+      :root {
+        --bg: #14161c;
+        --panel: #1b1e27;
+        --panel-2: #222634;
+        --border: #2e3345;
+        --text: #e8eaf2;
+        --text-dim: #9aa1b5;
+        --accent: #7c6cf0;
+        --accent-2: #5a8bff;
+        --user-bubble: #343a52;
+        --ai-bubble: #262b3a;
+        font-size: 15px;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body, #app { height: 100%; overflow: hidden; }
+      body {
+        font-family: "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      #app { display: flex; flex-direction: column; }
+
+      header {
+        height: 44px;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 16px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+      header .logo { font-weight: 700; letter-spacing: 0.5px; }
+      header .logo .flower { color: var(--accent); margin-right: 4px; }
+      header .status { color: var(--text-dim); font-size: 0.85rem; }
+      header .spacer { flex: 1; }
+      header select, header button {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      header button:hover { border-color: var(--accent); }
+
+      main { flex: 1; display: flex; min-height: 0; }
+
+      /* ---- Preview stage (main area) ---- */
+      #stage {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: #0d0f14;
+      }
+      #canvas-wrap {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+        padding: 16px;
+      }
+      #preview {
+        background: #000;
+        border-radius: 8px;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+        max-width: 100%;
+        max-height: 100%;
+      }
+      #overlay {
+        position: absolute;
+        top: 26px;
+        left: 26px;
+        color: var(--text-dim);
+        font-size: 0.8rem;
+        background: rgba(20,22,28,0.75);
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        pointer-events: none;
+      }
+      #files-panel {
+        position: absolute;
+        top: 26px;
+        right: 26px;
+        width: 230px;
+        max-height: 55%;
+        display: flex;
+        flex-direction: column;
+        background: rgba(22,25,33,0.92);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        backdrop-filter: blur(6px);
+        font-size: 0.8rem;
+        overflow: hidden;
+      }
+      #files-panel h3 {
+        flex: 0 0 auto;
+        margin: 0;
+        padding: 8px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-dim);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #files-panel h3 .spacer { flex: 1; }
+      #files-panel h3 button {
+        background: none; border: none; color: var(--text-dim);
+        cursor: pointer; font-size: 0.85rem; padding: 0 2px;
+      }
+      #files-panel h3 button:hover { color: var(--text); }
+      #files-list { overflow-y: auto; padding: 6px 4px; }
+      #files-list .file {
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: var(--text);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #files-list .file:hover { background: var(--panel-2); }
+      #files-list .file .icon { color: var(--text-dim); flex: 0 0 auto; }
+      #files-list .file .name { overflow: hidden; text-overflow: ellipsis; }
+      #files-list .empty { color: var(--text-dim); padding: 6px 10px; }
+      #transport {
+        flex: 0 0 auto;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 24px;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+      }
+      #transport button {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      #transport button:hover { border-color: var(--accent); }
+      #transport button { white-space: nowrap; }
+      #btn-export { font-size: 0.85rem; }
+      #timeline {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--panel-2);
+        position: relative;
+        cursor: pointer;
+      }
+      #timeline .fill {
+        position: absolute; inset: 0;
+        border-radius: 3px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        width: 0%;
+      }
+      #transport .time { color: var(--text-dim); font-variant-numeric: tabular-nums; font-size: 0.9rem; min-width: 110px; text-align: right; }
+
+      /* ---- Sidebar chat ---- */
+      #sidebar {
+        width: 360px;
+        flex: 0 0 360px;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        min-height: 0;
+      }
+      #sidebar h2 {
+        flex: 0 0 auto;
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        color: var(--text-dim);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .msg { max-width: 92%; border-radius: 12px; padding: 10px 12px; line-height: 1.5; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
+      .msg.user { align-self: flex-end; background: var(--user-bubble); }
+      .msg.ai { align-self: flex-start; background: var(--ai-bubble); }
+      .msg.ai.pending { opacity: 0.7; font-style: italic; }
+      .msg.error { align-self: stretch; background: #3a2028; color: #ff9aa8; border: 1px solid #5c2a36; }
+      .msg .scene-link { color: var(--accent-2); cursor: pointer; text-decoration: underline; }
+      .msg .tool-activity {
+        display: block;
+        margin: 4px 0;
+        padding: 3px 8px;
+        border-left: 2px solid var(--accent);
+        background: rgba(124,108,240,0.10);
+        border-radius: 4px;
+        color: var(--text-dim);
+        font-size: 0.82rem;
+      }
+
+      #composer {
+        flex: 0 0 auto;
+        display: flex;
+        gap: 8px;
+        padding: 12px;
+        border-top: 1px solid var(--border);
+      }
+      #composer textarea {
+        flex: 1;
+        resize: none;
+        height: 68px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        padding: 10px 12px;
+        font: inherit;
+        font-size: 0.9rem;
+      }
+      #composer textarea:focus { outline: none; border-color: var(--accent); }
+      #composer button {
+        align-self: flex-end;
+        height: 40px;
+        padding: 0 18px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #composer button:disabled { opacity: 0.45; cursor: default; }
+
+      #empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 24px 16px; text-align: center; line-height: 1.8; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="logo"><span class="flower">❀</span>LoniceraMograph</div>
+        <div class="status" id="provider-status">AI 未连接</div>
+        <div class="spacer"></div>
+        <select id="provider-select" title="AI Provider">
+          <option value="mock">Mock（离线演示）</option>
+          <option value="openai">OpenAI 兼容</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="ollama">Ollama（本地）</option>
+        </select>
+        <button id="btn-settings">设置</button>
+      </header>
+      <main>
+        <section id="stage">
+          <div id="canvas-wrap">
+            <canvas id="preview" width="1280" height="720"></canvas>
+            <div id="overlay">scene: (none)</div>
+            <div id="files-panel">
+              <h3>📁 工作区 <span class="spacer"></span><button id="btn-refresh-files" title="刷新">⟳</button></h3>
+              <div id="files-list"><div class="empty">（空）</div></div>
+            </div>
+          </div>
+          <div id="transport">
+            <button id="btn-play" title="播放/暂停">▶</button>
+            <button id="btn-restart" title="回到开头">⏮</button>
+            <div id="timeline"><div class="fill"></div></div>
+            <div class="time" id="time-label">0.0 / 0.0 s</div>
+            <button id="btn-export" title="从开头播放一遍并录制为 WebM（保存到下载目录）">⬇ 导出</button>
+          </div>
+        </section>
+        <aside id="sidebar">
+          <h2>✦ AI 对话</h2>
+          <div id="messages">
+            <div id="empty-hint">
+              描述你想要的动画，AI 会生成场景并实时渲染到预览区。<br/>
+              试试：「一个弹跳的小球，背景渐变」
+            </div>
+          </div>
+          <div id="composer">
+            <textarea id="chat-input" placeholder="描述你的动画…（Enter 发送，Shift+Enter 换行）"></textarea>
+            <button id="btn-send">发送</button>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+[package]
+name = "lonicera-mograph"
+version = "0.1.0"
+description = "AI 动画视频创作工具 —— 视频实时预览 + AI 对话侧边栏"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "lonicera_mograph_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures-util = "0.3"
+base64 = "0.22"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
