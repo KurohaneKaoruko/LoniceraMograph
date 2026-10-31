@@ -141,6 +141,16 @@
       #files-list .file .icon { color: var(--text-dim); flex: 0 0 auto; }
       #files-list .file .name { overflow: hidden; text-overflow: ellipsis; }
       #files-list .empty { color: var(--text-dim); padding: 6px 10px; }
+      #files-root {
+        flex: 0 0 auto;
+        padding: 4px 10px 6px;
+        color: var(--text-dim);
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-top: 1px solid var(--border);
+      }
       #transport {
         flex: 0 0 auto;
         height: 64px;
@@ -257,11 +267,52 @@
       }
       #composer button:disabled { opacity: 0.45; cursor: default; }
 
+      /* ---- 设置对话框（Tauri WebView 不支持 window.prompt，用内置 <dialog>） ---- */
+      #settings-dialog {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        min-width: 380px;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+      }
+      #settings-dialog::backdrop { background: rgba(0,0,0,0.55); }
+      #settings-dialog h3 { margin: 0 0 12px; font-size: 1rem; }
+      #settings-dialog label { display: block; margin: 10px 0 4px; color: var(--text-dim); font-size: 0.82rem; }
+      #settings-dialog input {
+        width: 100%;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        padding: 6px 10px;
+        font-size: 0.9rem;
+      }
+      #settings-dialog input:focus { outline: none; border-color: var(--accent); }
+      #settings-dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+      #settings-dialog .actions button {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      #settings-dialog .actions button:hover { border-color: var(--accent); }
+      #settings-dialog .actions button.primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border-color: transparent;
+        color: #fff;
+      }
+
       #empty-hint { color: var(--text-dim); font-size: 0.85rem; padding: 24px 16px; text-align: center; line-height: 1.8; }
     </style>
   </head>
   <body>
     <div id="app">
+
       <header>
         <div class="logo"><span class="flower">❀</span>LoniceraMograph</div>
         <div class="status" id="provider-status">AI 未连接</div>
@@ -282,6 +333,7 @@
             <div id="files-panel">
               <h3>📁 工作区 <span class="spacer"></span><button id="btn-refresh-files" title="刷新">⟳</button></h3>
               <div id="files-list"><div class="empty">（空）</div></div>
+              <div id="files-root" title=""></div>
             </div>
           </div>
           <div id="transport">
@@ -306,6 +358,19 @@
           </div>
         </aside>
       </main>
+      <dialog id="settings-dialog">
+        <h3>⚙ AI 设置</h3>
+        <label for="settings-base-url">Base URL</label>
+        <input id="settings-base-url" placeholder="如 https://api.openai.com/v1" />
+        <label for="settings-api-key">API Key</label>
+        <input id="settings-api-key" type="password" placeholder="sk-…" />
+        <label for="settings-model">模型名</label>
+        <input id="settings-model" placeholder="如 gpt-4o / claude-sonnet-4 / qwen2.5:7b" />
+        <div class="actions">
+          <button id="btn-settings-cancel">取消</button>
+          <button id="btn-settings-save" class="primary">保存</button>
+        </div>
+      </dialog>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

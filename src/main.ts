@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { PreviewRenderer } from "./renderer";
+import { sanitizeSceneMeta } from "./sceneValidate";
 import type { AiConfig, ChatMessage, DrawCmd, FileEntry, SceneMeta, StreamEvent } from "./types";
 
 /// ---------------------------------------------------------------------------
@@ -25,6 +26,12 @@ const timeLabel = $("time-label");
 const providerSelect = $<HTMLSelectElement>("provider-select");
 const settingsBtn = $<HTMLButtonElement>("btn-settings");
 const providerStatus = $("provider-status");
+const settingsDialog = $<HTMLDialogElement>("settings-dialog");
+const settingsBaseUrl = $<HTMLInputElement>("settings-base-url");
+const settingsApiKey = $<HTMLInputElement>("settings-api-key");
+const settingsModel = $<HTMLInputElement>("settings-model");
+const settingsSaveBtn = $<HTMLButtonElement>("btn-settings-save");
+const settingsCancelBtn = $<HTMLButtonElement>("btn-settings-cancel");
 
 const renderer = new PreviewRenderer(canvas);
 
@@ -99,7 +106,15 @@ function addMessage(role: "user" | "assistant" | "error", content: string): HTML
   // CSS 中 AI 气泡的类名是 .ai（历史原因），这里做一层映射
   div.className = `msg ${role === "error" ? "error" : role === "assistant" ? "ai" : role}`;
   if (role === "assistant") div.classList.add("pending");
-  div.textContent = content;
+  if (role === "assistant") {
+    // 正文放 .text span：流式 delta 与历史收集都只针对正文
+    const span = document.createElement("span");
+    span.className = "text";
+    span.textContent = content;
+    div.appendChild(span);
+  } else {
+    div.textContent = content;
+  }
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return div;
@@ -124,7 +139,23 @@ function appendToolActivity(detail: string) {
   line.textContent = detail;
   host.appendChild(line);
   host.classList.remove("pending");
+  ensureTextSpan(host);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+/** 取出（或补建）气泡内的正文 span：流式文本只写这里，不破坏工具活动等子元素。 */
+function ensureTextSpan(bubble: HTMLElement): HTMLSpanElement {
+  let span = bubble.querySelector<HTMLSpanElement>(":scope > .text");
+  if (!span) {
+    span = document.createElement("span");
+    span.className = "text";
+    // 仅收纳开头的散文本节点，工具活动等附加元素保持在外
+    while (bubble.firstChild && bubble.firstChild.nodeType === Node.TEXT_NODE) {
+      span.appendChild(bubble.firstChild);
+    }
+    bubble.prepend(span);
+  }
+  return span;
 }
 
 function handleStreamEvent(e: StreamEvent) {
@@ -132,7 +163,8 @@ function handleStreamEvent(e: StreamEvent) {
   switch (e.type) {
     case "delta": {
       if (last?.classList.contains("ai") && !last.dataset.done) {
-        last.textContent += e.text;
+        const span = ensureTextSpan(last);
+        span.textContent += e.text;
         last.classList.remove("pending");
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -182,12 +214,28 @@ function handleStreamEvent(e: StreamEvent) {
   }
 }
 
+/**
+ * 气泡正文的只读视图：collectHistory 用。
+ * 仅取正文 span（delta / 初始文本），跳过工具活动、场景链接、错误附注等附加节点。
+ */
+function bubbleText(bubble: HTMLElement): string {
+  return (bubble.querySelector<HTMLSpanElement>(":scope > .text")?.textContent ?? bubble.textContent ?? "").trim();
+}
+
+/** 标记气泡为「已完成且不进入后续对话历史」（导出提示、文件预览等系统消息）。 */
+function markNoHistory(bubble: HTMLElement | null) {
+  if (!bubble) return;
+  bubble.dataset.done = "1";
+  bubble.dataset.noHistory = "1";
+}
+
 function loadScene(scene: SceneMeta, frame: DrawCmd[], time: number) {
-  state.scene = scene;
+  const meta = sanitizeSceneMeta(scene);
+  state.scene = meta;
   state.frame = frame;
   state.time = time;
-  overlay.textContent = `scene: ${scene.name}`;
-  renderer.resize(scene.width, scene.height);
+  overlay.textContent = `scene: ${meta.name}`;
+  renderer.resize(meta.width, meta.height);
   paint();
   setPlaying(true);
 }
@@ -221,10 +269,11 @@ function collectHistory(latestUser: string): ChatMessage[] {
   nodes.forEach((n) => {
     const el = n as HTMLElement;
     const isUser = el.classList.contains("user");
-    if (!isUser && !el.classList.contains("ai")) return;
+    if (el.dataset.noHistory) return; // 系统提示类气泡（导出/文件预览），不进入历史
     if (isUser && !el.dataset.done && el.textContent === latestUser) return;
     if (!isUser && !el.dataset.done) return; // 流式中的气泡
-    const content = (el.textContent ?? "").trim();
+    // 只取正文：排除工具活动、场景链接等附加节点，避免污染对话历史
+    const content = bubbleText(el);
     if (content) out.push({ role: isUser ? "user" : "assistant", content });
   });
   return out;
@@ -300,8 +349,7 @@ async function exportVideo() {
     });
     addMessage("assistant", `✅ 已导出 ${sceneName}.webm（${(blob.size / 1024 / 1024).toFixed(1)} MB）\n📁 ${path}`);
     // 标记为完成态，避免进入后续对话历史
-    const last = messagesEl.lastElementChild as HTMLElement | null;
-    if (last?.classList.contains("ai")) last.dataset.done = "1";
+    markNoHistory(messagesEl.lastElementChild as HTMLElement | null);
   } catch (e) {
     addMessage("error", `导出失败: ${e}`);
   } finally {
@@ -316,6 +364,7 @@ async function exportVideo() {
 /// 工作区文件面板：列表 / 点击打开（场景→预览，脚本→执行，其他→弹窗预览）
 /// ---------------------------------------------------------------------------
 const filesListEl = $("files-list");
+const filesRootEl = $("files-root");
 const refreshFilesBtn = $<HTMLButtonElement>("btn-refresh-files");
 
 async function refreshFiles() {
@@ -327,23 +376,26 @@ async function refreshFiles() {
       empty.className = "empty";
       empty.textContent = "（空）让 AI 帮你创建第一个场景吧";
       filesListEl.appendChild(empty);
-      return;
+    } else {
+      for (const entry of entries) {
+        if (entry.isDir) continue;
+        const row = document.createElement("div");
+        row.className = "file";
+        row.title = entry.path;
+        const icon = document.createElement("span");
+        icon.className = "icon";
+        icon.textContent = entry.path.endsWith(".js") ? "⚙" : entry.path.endsWith(".json") ? "🎬" : "📄";
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = entry.path;
+        row.append(icon, name);
+        row.addEventListener("click", () => void openWorkspaceFile(entry.path));
+        filesListEl.appendChild(row);
+      }
     }
-    for (const entry of entries) {
-      if (entry.isDir) continue;
-      const row = document.createElement("div");
-      row.className = "file";
-      row.title = entry.path;
-      const icon = document.createElement("span");
-      icon.className = "icon";
-      icon.textContent = entry.path.endsWith(".js") ? "⚙" : entry.path.endsWith(".json") ? "🎬" : "📄";
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = entry.path;
-      row.append(icon, name);
-      row.addEventListener("click", () => void openWorkspaceFile(entry.path));
-      filesListEl.appendChild(row);
-    }
+    // 面板底部展示工作区绝对路径
+    filesRootEl.textContent = await invoke<string>("workspace_root");
+    filesRootEl.title = filesRootEl.textContent;
   } catch (e) {
     console.error("list_files failed", e);
   }
@@ -361,8 +413,7 @@ async function openWorkspaceFile(path: string) {
     } else {
       const content = await invoke<string>("read_file", { path });
       addMessage("assistant", `📄 ${path}\n\n${content.slice(0, 1200)}`);
-      const last = messagesEl.lastElementChild as HTMLElement | null;
-      if (last?.classList.contains("ai")) last.dataset.done = "1";
+      markNoHistory(messagesEl.lastElementChild as HTMLElement | null);
     }
   } catch (e) {
     addMessage("error", `打开 ${path} 失败: ${e}`);
@@ -397,15 +448,36 @@ function updateProviderStatus() {
 
 function openSettings() {
   const cfg = getAiConfig();
-  const baseUrl = prompt("Base URL（如 https://api.openai.com/v1）", cfg.baseUrl);
-  if (baseUrl === null) return;
-  const apiKey = prompt("API Key", cfg.apiKey);
-  if (apiKey === null) return;
-  const model = prompt("模型名（如 gpt-4o / claude-sonnet-4 / qwen2.5:7b）", cfg.model);
-  if (model === null) return;
-  localStorage.setItem(CONFIG_KEY, JSON.stringify({ baseUrl, apiKey, model }));
-  updateProviderStatus();
+  settingsBaseUrl.value = cfg.baseUrl;
+  settingsApiKey.value = cfg.apiKey;
+  settingsModel.value = cfg.model;
+  settingsDialog.showModal();
+  settingsBaseUrl.focus();
 }
+
+settingsSaveBtn.addEventListener("click", () => {
+  localStorage.setItem(
+    CONFIG_KEY,
+    JSON.stringify({
+      baseUrl: settingsBaseUrl.value.trim(),
+      apiKey: settingsApiKey.value.trim(),
+      model: settingsModel.value.trim(),
+    }),
+  );
+  settingsDialog.close();
+  updateProviderStatus();
+});
+settingsCancelBtn.addEventListener("click", () => settingsDialog.close());
+// 点击背景遮罩关闭
+settingsDialog.addEventListener("click", (e) => {
+  if (e.target === settingsDialog) settingsDialog.close();
+});
+settingsDialog.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
+    e.preventDefault();
+    settingsSaveBtn.click();
+  }
+});
 
 /// ---------------------------------------------------------------------------
 /// 事件绑定与启动
@@ -433,13 +505,39 @@ restartBtn.addEventListener("click", () => {
   void refreshFrame();
   paint();
 });
-timelineEl.addEventListener("click", (e) => {
+// 点击/拖拽进度条 scrub：按住拖动时暂停播放、实时预览，松开后恢复原播放状态
+let scrubbing = false;
+let playingBeforeScrub = false;
+
+/** 把指针位置换算成时间轴时刻并刷新预览。 */
+function seekToClientX(clientX: number) {
   if (!state.scene) return;
   const rect = timelineEl.getBoundingClientRect();
-  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   state.time = ratio * state.scene.durationSec;
   void refreshFrame();
   paint();
+}
+
+timelineEl.addEventListener("pointerdown", (e) => {
+  if (!state.scene) return;
+  scrubbing = true;
+  playingBeforeScrub = state.playing;
+  setPlaying(false);
+  timelineEl.setPointerCapture(e.pointerId);
+  seekToClientX(e.clientX);
+});
+timelineEl.addEventListener("pointermove", (e) => {
+  if (!scrubbing) return;
+  seekToClientX(e.clientX);
+});
+timelineEl.addEventListener("pointerup", (e) => {
+  if (!scrubbing) return;
+  scrubbing = false;
+  timelineEl.releasePointerCapture(e.pointerId);
+  if (playingBeforeScrub && state.scene && state.time < state.scene.durationSec) {
+    setPlaying(true);
+  }
 });
 providerSelect.addEventListener("change", () => {
   localStorage.setItem(PROVIDER_KEY, providerSelect.value);
@@ -451,7 +549,7 @@ providerSelect.value = localStorage.getItem(PROVIDER_KEY) ?? "mock";
 updateProviderStatus();
 requestAnimationFrame(tick);
 
-// 首次启动拉默认场景，预览区不空白
+// 首次启动拉默认场景与工作区文件列表，预览区/文件面板不空白
 void (async () => {
   try {
     const scene = await invoke<SceneMeta>("get_default_scene");
@@ -460,4 +558,5 @@ void (async () => {
   } catch (e) {
     console.error("初始场景加载失败", e);
   }
+  await refreshFiles();
 })();

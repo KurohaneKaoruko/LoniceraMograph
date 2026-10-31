@@ -6,7 +6,7 @@ AI Agent 驱动的 MG（Motion Graphics）动画创作工具。**视频实时预
 
 ## 功能
 
-- 🎬 **实时预览**：Canvas 渲染 + requestAnimationFrame 播放循环，播放/暂停/进度条拖拽
+- 🎬 **实时预览**：Canvas 渲染 + requestAnimationFrame 播放循环，播放/暂停/进度条拖拽 scrub
 - 🤖 **Agent 能力**：AI 通过 function calling 操控工作区文件——
   - `list_files` / `read_file` / `write_file` / `delete_file` / `rename_file`
   - `load_scene` 加载场景 JSON 到预览；`compile_script` 执行 JS 脚本生成场景
@@ -42,6 +42,11 @@ npm install          # 安装前端依赖
 npm run tauri dev    # 开发模式（热重载）
 ```
 
+```bash
+npm test             # 前端纯逻辑单元测试（node:test，无需浏览器）
+npm run build        # 前端类型检查 + Vite 构建产物（Tauri 打包时自动调用）
+```
+
 | 模块（`src-tauri/src/`） | 职责 |
 |------|------|
 | `scene.rs`       | 场景模型、补间求值、缓动函数 |
@@ -52,7 +57,14 @@ npm run tauri dev    # 开发模式（热重载）
 | `commands.rs`    | Tauri 命令（前端唯一后端入口） |
 | `events.rs`      | 主进程 → 前端事件协议 |
 
-测试：`cd src-tauri && cargo test`（9 个测试：场景求值、JSON 提取、脚本沙箱、路径安全…）
+| 模块（`src/`） | 职责 |
+|------|------|
+| `main.ts`           | 界面装配：预览循环、聊天流、导出、文件面板、AI 设置 |
+| `renderer.ts`       | Canvas 光栅化：消费 Rust 下发的 DrawCmd |
+| `types.ts`          | 与 Rust 结构对应的事件/数据类型 |
+| `sceneValidate.ts`  | 场景元信息护栏（纯函数，含单元测试） |
+
+测试：`cd src-tauri && cargo test`（9 个测试：场景求值、JSON 提取、脚本沙箱、路径安全…）；前端 `npm test`。
 
 ## 发布构建
 
@@ -64,7 +76,7 @@ npm run tauri build
 
 ## AI 配置
 
-右上角选择 Provider，「设置」中填写 Base URL / API Key / 模型名（存储于 localStorage）。Mock 模式开箱即用。Agent 文件能力需要真实 Provider（OpenAI 兼容 / Anthropic / Ollama 均已支持工具调用）。
+右上角选择 Provider，「设置」中填写 Base URL / API Key / 模型名（存储于 localStorage；Mock 无需配置）。Mock 模式开箱即用。Agent 文件能力需要真实 Provider（OpenAI 兼容 / Anthropic / Ollama 均已支持工具调用）。
 
 ## 场景 JSON 速览
 

@@ -3,6 +3,15 @@
 
 import type { DrawCmd } from "./types";
 
+/// 文本对齐映射：与场景 JSON 的 align / baseline 字段对应（缺省 left / alphabetic）。
+const TEXT_ALIGN: Record<string, CanvasTextAlign> = { left: "left", center: "center", right: "right" };
+const TEXT_BASELINE: Record<string, CanvasTextBaseline> = {
+  top: "top",
+  middle: "middle",
+  bottom: "bottom",
+  alphabetic: "alphabetic",
+};
+
 export class PreviewRenderer {
   private ctx: CanvasRenderingContext2D;
 
@@ -69,9 +78,9 @@ export class PreviewRenderer {
         case "text": {
           ctx.fillStyle = c.fill;
           ctx.font = `${c.size}px "Segoe UI", "PingFang SC", sans-serif`;
-          ctx.textBaseline = "middle";
+          ctx.textAlign = TEXT_ALIGN[c.align ?? ""] ?? "left";
+          ctx.textBaseline = TEXT_BASELINE[c.baseline ?? ""] ?? "alphabetic";
           ctx.fillText(c.text, c.x, c.y);
-          backgroundTextBaselineFix(ctx);
           break;
         }
         case "path": {
@@ -89,6 +98,3 @@ export class PreviewRenderer {
     }
   }
 }
-
-/// textBaseline 已设为 middle，无需额外修正；保留空函数避免破坏结构。
-function backgroundTextBaselineFix(_ctx: CanvasRenderingContext2D) {}
