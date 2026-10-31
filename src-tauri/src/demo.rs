@@ -36,6 +36,9 @@ fn text(x: f64, y: f64, content: &str, size: f64, fill: &str) -> Shape {
         opacity: Some(1.0),
         align: Some("center".into()),
         baseline: Some("middle".into()),
+        rotation: None,
+        stroke: None,
+        stroke_width: None,
     }
 }
 
@@ -46,6 +49,9 @@ fn circle(x: f64, y: f64, r: f64, fill: &str) -> Shape {
         r,
         fill: fill.into(),
         opacity: Some(1.0),
+        rotation: None,
+        stroke: None,
+        stroke_width: None,
     }
 }
 
@@ -58,6 +64,8 @@ fn ellipse(x: f64, y: f64, rx: f64, ry: f64, fill: &str, opacity: f64) -> Shape 
         fill: fill.into(),
         opacity: Some(opacity),
         rotation: Some(0.0),
+        stroke: None,
+        stroke_width: None,
     }
 }
 
@@ -71,6 +79,8 @@ fn rect(x: f64, y: f64, w: f64, h: f64, fill: &str, radius: f64, opacity: f64) -
         radius: Some(radius),
         opacity: Some(opacity),
         rotation: None,
+        stroke: None,
+        stroke_width: None,
     }
 }
 
@@ -109,6 +119,8 @@ pub fn default_scene() -> Scene {
             radius: Some(14.0),
             opacity: Some(0.05),
             rotation: Some(-0.18),
+            stroke: None,
+            stroke_width: None,
         },
         vec![anim("x", -360.0, 1580.0, 2.1, 3.7, Easing::EaseInOut)],
     ));
@@ -404,6 +416,8 @@ pub fn scene_from_prompt(prompt: &str) -> Scene {
             radius: Some(12.0),
             opacity: Some(0.05),
             rotation: Some(-0.18),
+            stroke: None,
+            stroke_width: None,
         },
         vec![anim(
             "x",

@@ -26,6 +26,21 @@ export class PreviewRenderer {
     this.canvas.height = h;
   }
 
+  /**
+   * 绕指定中心旋转（弧度）后执行绘制，结束后复位变换。
+   */
+  private rotateAround(cx: number, cy: number, rotation: number | undefined, paint: () => void) {
+    if (!rotation) {
+      paint();
+      return;
+    }
+    this.ctx.translate(cx, cy);
+    this.ctx.rotate(rotation);
+    this.ctx.translate(-cx, -cy);
+    paint();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
   draw(cmds: DrawCmd[], w: number, h: number) {
     const { ctx } = this;
     ctx.clearRect(0, 0, w, h);
@@ -33,7 +48,7 @@ export class PreviewRenderer {
     ctx.fillRect(0, 0, w, h);
     for (const c of cmds) {
       ctx.save();
-      ctx.globalAlpha = c.opacity ?? 1;
+      ctx.globalAlpha = Math.max(0, Math.min(1, c.opacity ?? 1));
       switch (c.kind) {
         case "rect": {
           if (c.rotation) {
@@ -46,9 +61,19 @@ export class PreviewRenderer {
             ctx.roundRect(c.x, c.y, c.w, c.h, c.radius);
             ctx.fillStyle = c.fill;
             ctx.fill();
+            if (c.stroke) {
+              ctx.strokeStyle = c.stroke;
+              ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+              ctx.stroke();
+            }
           } else {
             ctx.fillStyle = c.fill;
             ctx.fillRect(c.x, c.y, c.w, c.h);
+            if (c.stroke) {
+              ctx.strokeStyle = c.stroke;
+              ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+              ctx.strokeRect(c.x, c.y, c.w, c.h);
+            }
           }
           break;
         }
@@ -57,6 +82,11 @@ export class PreviewRenderer {
           ctx.arc(c.x, c.y, Math.max(0, c.r), 0, Math.PI * 2);
           ctx.fillStyle = c.fill;
           ctx.fill();
+          if (c.stroke) {
+            ctx.strokeStyle = c.stroke;
+            ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+            ctx.stroke();
+          }
           break;
         }
         case "ellipse": {
@@ -64,6 +94,11 @@ export class PreviewRenderer {
           ctx.ellipse(c.x, c.y, Math.max(0, c.rx), Math.max(0, c.ry), c.rotation ?? 0, 0, Math.PI * 2);
           ctx.fillStyle = c.fill;
           ctx.fill();
+          if (c.stroke) {
+            ctx.strokeStyle = c.stroke;
+            ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+            ctx.stroke();
+          }
           break;
         }
         case "line": {
@@ -80,17 +115,33 @@ export class PreviewRenderer {
           ctx.font = `${c.size}px "Segoe UI", "PingFang SC", sans-serif`;
           ctx.textAlign = TEXT_ALIGN[c.align ?? ""] ?? "left";
           ctx.textBaseline = TEXT_BASELINE[c.baseline ?? ""] ?? "alphabetic";
+          // 文本旋转以锚点 (x, y) 为中心
+          if (c.rotation) {
+            ctx.translate(c.x, c.y);
+            ctx.rotate(c.rotation);
+            ctx.translate(-c.x, -c.y);
+          }
           ctx.fillText(c.text, c.x, c.y);
+          if (c.stroke) {
+            ctx.strokeStyle = c.stroke;
+            ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+            ctx.strokeText(c.text, c.x, c.y);
+          }
           break;
         }
         case "path": {
-          if (c.rotation) {
-            // path 以包围盒中心旋转
-            // 简化实现：不做（MVP 阶段 path 不带 rotation）
-          }
-          const p = new Path2D(c.d);
-          ctx.fillStyle = c.fill;
-          ctx.fill(p);
+          // 旋转以包围盒中心（Rust normalize 时计算下发）为原点
+          this.rotateAround(c.cx ?? 0, c.cy ?? 0, c.rotation, () => {
+            const p = new Path2D(c.d);
+            ctx.fillStyle = c.fill;
+            ctx.fill(p);
+            if (c.stroke) {
+              ctx.strokeStyle = c.stroke;
+              ctx.lineWidth = Math.max(0.1, c.strokeWidth ?? 2);
+              ctx.lineJoin = "round";
+              ctx.stroke(p);
+            }
+          });
           break;
         }
       }

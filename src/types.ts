@@ -2,12 +2,12 @@
 
 /** 绘制指令：Rust 每帧求值后下发，前端只负责光栅化。 */
 export type DrawCmd =
-  | { kind: "rect"; x: number; y: number; w: number; h: number; fill: string; radius?: number; opacity?: number; rotation?: number }
-  | { kind: "circle"; x: number; y: number; r: number; fill: string; opacity?: number }
-  | { kind: "ellipse"; x: number; y: number; rx: number; ry: number; fill: string; opacity?: number; rotation?: number }
+  | { kind: "rect"; x: number; y: number; w: number; h: number; fill: string; radius?: number; opacity?: number; rotation?: number; stroke?: string; strokeWidth?: number }
+  | { kind: "circle"; x: number; y: number; r: number; fill: string; opacity?: number; rotation?: number; stroke?: string; strokeWidth?: number }
+  | { kind: "ellipse"; x: number; y: number; rx: number; ry: number; fill: string; opacity?: number; rotation?: number; stroke?: string; strokeWidth?: number }
   | { kind: "line"; x1: number; y1: number; x2: number; y2: number; stroke: string; width: number; opacity?: number }
-  | { kind: "text"; x: number; y: number; text: string; size: number; fill: string; opacity?: number; align?: string; baseline?: string }
-  | { kind: "path"; d: string; fill: string; opacity?: number; rotation?: number };
+  | { kind: "text"; x: number; y: number; text: string; size: number; fill: string; opacity?: number; align?: string; baseline?: string; rotation?: number; stroke?: string; strokeWidth?: number }
+  | { kind: "path"; d: string; fill: string; opacity?: number; rotation?: number; stroke?: string; strokeWidth?: number; cx?: number; cy?: number };
 
 export interface SceneMeta {
   name: string;

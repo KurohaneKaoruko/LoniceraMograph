@@ -113,7 +113,7 @@ pub fn definitions() -> Value {
 pub const SCRIPT_GUIDE: &str = r##"【JS 脚本生成动画】scripts/*.js 运行在受限沙箱（无网络/文件/DOM），可用全局辅助函数：
 - scene(name, durationSec) 创建场景
 - addLayer(shape, animations) 添加图层；shape 用 { kind, ... } 描述
-- text(str, x, y, opts) / rect(x,y,w,h,opts) / circle(x,y,r,opts) / ellipse / line / path 快捷构造图元
+- text(str, x, y, opts) / rect(x,y,w,h,opts) / circle(x,y,r,opts) / ellipse / line / path 快捷构造图元；opts 支持 fill/opacity/rotation/stroke/strokeWidth 等
 - anim(prop, from, to, start, end, easing) 构造补间
 - easing.easeOutCubic 等为预置缓动
 - 最后 exportScene(scene) 导出。整体必须在 300ms 内完成。
@@ -273,6 +273,14 @@ fn check_scene_errors(scene: &Scene) -> String {
             }
         }
 
+        // 描边宽度与颜色粗查
+        let stroke_width = layer.shape.get_prop("strokeWidth");
+        if let Some(w) = stroke_width {
+            if w > 100.0 {
+                problems.push(label("描边过粗（strokeWidth > 100），可能糊成一团"));
+            }
+        }
+
         match &layer.shape {
             crate::scene::Shape::Rect { x, y, w, h, .. } => {
                 if *w < 1.0 || *h < 1.0 {
@@ -318,5 +326,97 @@ fn check_scene_errors(scene: &Scene) -> String {
         "场景检查通过，未发现问题。".into()
     } else {
         format!("发现 {} 个问题：\n- {}", problems.len(), problems.join("\n- "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::Shape;
+
+    fn scene_with(shape: Shape, animations: Vec<crate::scene::Animation>) -> Scene {
+        Scene {
+            name: "t".into(),
+            duration_sec: 5.0,
+            width: 1280.0,
+            height: 720.0,
+            background: "#000".into(),
+            layers: vec![crate::scene::Layer { shape, animations }],
+        }
+    }
+
+    #[test]
+    fn check_reports_unsupported_anim_prop() {
+        let scene = scene_with(
+            Shape::Circle {
+                x: 640.0,
+                y: 360.0,
+                r: 40.0,
+                fill: "#fff".into(),
+                opacity: None,
+                rotation: None,
+                stroke: None,
+                stroke_width: None,
+            },
+            vec![crate::scene::Animation {
+                prop: "depth".into(), // circle 没有 depth 属性
+                from: Some(0.0),
+                to: Some(1.0),
+                start: None,
+                end: None,
+                easing: Default::default(),
+            }],
+        );
+        let report = check_scene_errors(&scene);
+        assert!(report.contains("不受支持"), "应报出不支持属性：{report}");
+    }
+
+    #[test]
+    fn check_reports_oversized_stroke() {
+        let scene = scene_with(
+            Shape::Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 100.0,
+                h: 100.0,
+                fill: "#fff".into(),
+                radius: None,
+                opacity: None,
+                rotation: None,
+                stroke: Some("#f00".into()),
+                stroke_width: Some(200.0),
+            },
+            vec![],
+        );
+        let report = check_scene_errors(&scene);
+        assert!(report.contains("描边过粗"), "应报出描边过粗：{report}");
+    }
+
+    #[test]
+    fn check_passes_healthy_scene() {
+        let scene = scene_with(
+            Shape::Text {
+                x: 640.0,
+                y: 360.0,
+                text: "你好".into(),
+                size: 64.0,
+                fill: "#fff".into(),
+                opacity: None,
+                align: Some("center".into()),
+                baseline: Some("middle".into()),
+                rotation: None,
+                stroke: None,
+                stroke_width: None,
+            },
+            vec![crate::scene::Animation {
+                prop: "rotation".into(), // text 现在支持 rotation
+                from: Some(0.0),
+                to: Some(1.0),
+                start: None,
+                end: None,
+                easing: Default::default(),
+            }],
+        );
+        assert_eq!(check_scene_errors(&scene), "场景检查通过，未发现问题。");
     }
 }

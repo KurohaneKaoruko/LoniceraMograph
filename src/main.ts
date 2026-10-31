@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 import { PreviewRenderer } from "./renderer";
 import { sanitizeSceneMeta } from "./sceneValidate";
+import { sanitizeCmds } from "./drawSanitize";
 import type { AiConfig, ChatMessage, DrawCmd, FileEntry, SceneMeta, StreamEvent } from "./types";
 
 /// ---------------------------------------------------------------------------
@@ -77,7 +78,7 @@ function tick(ts: number) {
 async function refreshFrame() {
   if (!state.scene) return;
   try {
-    state.frame = await invoke<DrawCmd[]>("get_frame", { time: state.time });
+    state.frame = sanitizeCmds(await invoke<DrawCmd[]>("get_frame", { time: state.time }));
   } catch (e) {
     console.error("get_frame failed", e);
   }
@@ -232,7 +233,7 @@ function markNoHistory(bubble: HTMLElement | null) {
 function loadScene(scene: SceneMeta, frame: DrawCmd[], time: number) {
   const meta = sanitizeSceneMeta(scene);
   state.scene = meta;
-  state.frame = frame;
+  state.frame = sanitizeCmds(frame);
   state.time = time;
   overlay.textContent = `scene: ${meta.name}`;
   renderer.resize(meta.width, meta.height);
@@ -304,6 +305,9 @@ async function exportVideo() {
   exporting = true;
   exportBtn.disabled = true;
   const label = timeLabel.textContent;
+  // 导出提示气泡（不进对话历史），随进度更新
+  const progress = addMessage("assistant", "🎬 正在录制导出…");
+  markNoHistory(progress);
 
   try {
     const stream = canvas.captureStream(60);
@@ -322,9 +326,19 @@ async function exportVideo() {
     paint();
     rec.start(200);
 
-    // 等待播放到结尾（播放循环会在到尾时自动 setPlaying(false)）
+    // 等待播放到结尾（播放循环会在到尾时自动 setPlaying(false)），
+    // 期间把进度写进提示气泡
+    const dur = state.scene.durationSec;
     await new Promise<void>((resolve) => {
-      const check = () => (state.playing ? requestAnimationFrame(check) : resolve());
+      const check = () => {
+        if (!state.playing) {
+          resolve();
+          return;
+        }
+        progress.querySelector<HTMLSpanElement>(":scope > .text")!.textContent =
+          `🎬 正在录制导出… ${Math.min(100, Math.round((state.time / dur) * 100))}%`;
+        requestAnimationFrame(check);
+      };
       requestAnimationFrame(check);
     });
     rec.stop();
@@ -343,13 +357,14 @@ async function exportVideo() {
     }
     const b64 = btoa(bin);
     const sceneName = (state.scene.name || "motion").trim();
+    progress.querySelector<HTMLSpanElement>(":scope > .text")!.textContent = "💾 正在保存…";
     const path = await invoke<string>("save_export", {
       filename: sceneName,
       dataBase64: b64,
     });
-    addMessage("assistant", `✅ 已导出 ${sceneName}.webm（${(blob.size / 1024 / 1024).toFixed(1)} MB）\n📁 ${path}`);
-    // 标记为完成态，避免进入后续对话历史
-    markNoHistory(messagesEl.lastElementChild as HTMLElement | null);
+    // 成功提示替换进度气泡的正文，保持界面干净
+    progress.querySelector<HTMLSpanElement>(":scope > .text")!.textContent =
+      `✅ 已导出 ${sceneName}.webm（${(blob.size / 1024 / 1024).toFixed(1)} MB）\n📁 ${path}`;
   } catch (e) {
     addMessage("error", `导出失败: ${e}`);
   } finally {
@@ -357,6 +372,12 @@ async function exportVideo() {
     exportBtn.disabled = false;
     timeLabel.textContent = label;
     setPlaying(false);
+    // 播放头回到开头，便于立刻再导出/预览一遍
+    if (state.scene) {
+      state.time = 0;
+      void refreshFrame();
+      paint();
+    }
   }
 }
 

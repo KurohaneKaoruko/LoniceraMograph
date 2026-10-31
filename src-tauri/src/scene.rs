@@ -77,6 +77,11 @@ pub enum Shape {
         opacity: Option<f64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rotation: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stroke: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f64>,
     },
     Circle {
         x: f64,
@@ -86,6 +91,13 @@ pub enum Shape {
         fill: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         opacity: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rotation: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stroke: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f64>,
     },
     Ellipse {
         x: f64,
@@ -98,6 +110,11 @@ pub enum Shape {
         opacity: Option<f64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rotation: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stroke: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f64>,
     },
     Line {
         x1: f64,
@@ -128,6 +145,13 @@ pub enum Shape {
         /// "top" | "middle" | "bottom" | "alphabetic"（默认 alphabetic）
         #[serde(default, skip_serializing_if = "Option::is_none")]
         baseline: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rotation: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stroke: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f64>,
     },
     Path {
         #[serde(default)]
@@ -138,6 +162,16 @@ pub enum Shape {
         opacity: Option<f64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         rotation: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stroke: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "strokeWidth")]
+        stroke_width: Option<f64>,
+        /// path 旋转/描边以包围盒中心为原点（由 normalize 时计算）。
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cx: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cy: Option<f64>,
     },
 }
 
@@ -246,15 +280,24 @@ impl Shape {
             (Shape::Rect { w, .. }, "w") => Some(*w),
             (Shape::Rect { h, .. }, "h") => Some(*h),
             (Shape::Rect { radius, .. }, "radius") => Some(radius.unwrap_or(0.0)),
+            (Shape::Rect { stroke_width, .. }, "strokeWidth") => {
+                Some(stroke_width.unwrap_or(0.0))
+            }
 
             (Shape::Circle { x, .. }, "x") => Some(*x),
             (Shape::Circle { y, .. }, "y") => Some(*y),
             (Shape::Circle { r, .. }, "r") => Some(*r),
+            (Shape::Circle { stroke_width, .. }, "strokeWidth") => {
+                Some(stroke_width.unwrap_or(0.0))
+            }
 
             (Shape::Ellipse { x, .. }, "x") => Some(*x),
             (Shape::Ellipse { y, .. }, "y") => Some(*y),
             (Shape::Ellipse { rx, .. }, "rx") => Some(*rx),
             (Shape::Ellipse { ry, .. }, "ry") => Some(*ry),
+            (Shape::Ellipse { stroke_width, .. }, "strokeWidth") => {
+                Some(stroke_width.unwrap_or(0.0))
+            }
 
             (Shape::Line { x1, .. }, "x1") => Some(*x1),
             (Shape::Line { y1, .. }, "y1") => Some(*y1),
@@ -266,7 +309,9 @@ impl Shape {
             (Shape::Text { y, .. }, "y") => Some(*y),
             (Shape::Text { size, .. }, "size") => Some(*size),
 
-            (Shape::Path { .. }, _) => None,
+            (Shape::Path { stroke_width, .. }, "strokeWidth") => {
+                Some(stroke_width.unwrap_or(0.0))
+            }
 
             (_, "opacity") => Some(self.opacity().unwrap_or(1.0)),
             (_, "rotation") => Some(self.rotation().unwrap_or(0.0)),
@@ -284,16 +329,25 @@ impl Shape {
             (Shape::Rect { y, .. }, "y") => *y = value,
             (Shape::Rect { w, .. }, "w") => *w = value.max(0.0),
             (Shape::Rect { h, .. }, "h") => *h = value.max(0.0),
+            (Shape::Rect { stroke_width, .. }, "strokeWidth") => {
+                *stroke_width = Some(value.max(0.0))
+            }
             (Shape::Rect { radius, .. }, "radius") => *radius = Some(value.max(0.0)),
 
             (Shape::Circle { x, .. }, "x") => *x = value,
             (Shape::Circle { y, .. }, "y") => *y = value,
             (Shape::Circle { r, .. }, "r") => *r = value.max(0.0),
+            (Shape::Circle { stroke_width, .. }, "strokeWidth") => {
+                *stroke_width = Some(value.max(0.0))
+            }
 
             (Shape::Ellipse { x, .. }, "x") => *x = value,
             (Shape::Ellipse { y, .. }, "y") => *y = value,
             (Shape::Ellipse { rx, .. }, "rx") => *rx = value.max(0.0),
             (Shape::Ellipse { ry, .. }, "ry") => *ry = value.max(0.0),
+            (Shape::Ellipse { stroke_width, .. }, "strokeWidth") => {
+                *stroke_width = Some(value.max(0.0))
+            }
 
             (Shape::Line { x1, .. }, "x1") => *x1 = value,
             (Shape::Line { y1, .. }, "y1") => *y1 = value,
@@ -319,7 +373,9 @@ impl Shape {
             (_, "rotation") => {
                 match self {
                     Shape::Rect { rotation, .. }
+                    | Shape::Circle { rotation, .. }
                     | Shape::Ellipse { rotation, .. }
+                    | Shape::Text { rotation, .. }
                     | Shape::Path { rotation, .. } => *rotation = Some(value),
                     _ => {}
                 }
@@ -342,11 +398,57 @@ impl Shape {
     fn rotation(&self) -> Option<f64> {
         match self {
             Shape::Rect { rotation, .. }
+            | Shape::Circle { rotation, .. }
             | Shape::Ellipse { rotation, .. }
+            | Shape::Text { rotation, .. }
             | Shape::Path { rotation, .. } => *rotation,
             _ => None,
         }
     }
+}
+
+/// 从 SVG path 数据中提取全部数字，两两成对视作坐标点，返回包围盒 (x, y, w, h)。
+///
+/// 近似处理：弧线（a/A）的半径与角度参数也会被计入，会使包围盒略微偏大——
+/// 对「求旋转中心」这个用途足够，无需完整实现 path 语义解析。
+fn path_bbox(d: &str) -> (f64, f64, f64, f64) {
+    fn nums(d: &str) -> Vec<f64> {
+        let mut out = Vec::new();
+        let bytes = d.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i].is_ascii_digit() || bytes[i] == b'-' || bytes[i] == b'+' || bytes[i] == b'.' {
+                let start = i;
+                while i < bytes.len()
+                    && (bytes[i].is_ascii_digit()
+                        || matches!(bytes[i], b'-' | b'+' | b'.' | b'e' | b'E'))
+                {
+                    i += 1;
+                }
+                if let Ok(v) = d[start..i].parse::<f64>() {
+                    out.push(v);
+                }
+            } else {
+                i += 1;
+            }
+        }
+        out
+    }
+
+    let (mut min_x, mut min_y, mut max_x, mut max_y) =
+        (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for pair in nums(d).chunks(2) {
+        if pair.len() == 2 {
+            min_x = min_x.min(pair[0]);
+            min_y = min_y.min(pair[1]);
+            max_x = max_x.max(pair[0]);
+            max_y = max_y.max(pair[1]);
+        }
+    }
+    if !min_x.is_finite() {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
+    (min_x, min_y, max_x - min_x, max_y - min_y)
 }
 
 impl Scene {
@@ -364,6 +466,8 @@ impl Scene {
             radius: None,
             opacity: Some(1.0),
             rotation: None,
+            stroke: None,
+            stroke_width: None,
         });
 
         for layer in &self.layers {
@@ -415,7 +519,26 @@ impl Scene {
             self.background = default_background();
         }
         for layer in &mut self.layers {
+            // 包围盒中心（仅 path 需要：旋转/描边围绕它进行）
+            if let Shape::Path { d, cx, cy, .. } = &mut layer.shape {
+                if cx.is_none() || cy.is_none() {
+                    let (bx, by, bw, bh) = path_bbox(d);
+                    *cx = Some(bx + bw / 2.0);
+                    *cy = Some(by + bh / 2.0);
+                }
+            }
             for anim in &mut layer.animations {
+                // 非有限的 from/to 会让整条补间失效，直接丢弃
+                if let Some(f) = anim.from {
+                    if !f.is_finite() {
+                        anim.from = None;
+                    }
+                }
+                if let Some(t) = anim.to {
+                    if !t.is_finite() {
+                        anim.to = None;
+                    }
+                }
                 if let Some(s) = anim.start {
                     anim.start = Some(s.clamp(0.0, self.duration_sec));
                 }
@@ -449,5 +572,120 @@ impl From<&Scene> for SceneMeta {
             width: scene.width,
             height: scene.height,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_sanitizes_non_finite_values() {
+        // serde 会拒绝 1e999 字面量（number out of range），这里直接用 f64 构造
+        // 非有限值——来自算术溢出（如 1e308 * 10）的场景走同一条 normalize 路径。
+        let mut scene = Scene {
+            name: "t".into(),
+            duration_sec: f64::INFINITY,
+            width: f64::NEG_INFINITY,
+            height: f64::NAN,
+            background: "  ".into(),
+            layers: vec![crate::scene::Layer {
+                shape: Shape::Circle {
+                    x: 0.0,
+                    y: 0.0,
+                    r: 10.0,
+                    fill: "#fff".into(),
+                    opacity: None,
+                    rotation: None,
+                    stroke: None,
+                    stroke_width: None,
+                },
+                animations: vec![crate::scene::Animation {
+                    prop: "x".into(),
+                    from: Some(0.0),
+                    to: Some(f64::INFINITY),
+                    start: Some(-3.0),
+                    end: Some(99.0),
+                    easing: Default::default(),
+                }],
+            }],
+        };
+        scene.normalize();
+        assert_eq!(scene.duration_sec, 6.0);
+        assert_eq!(scene.width, 1280.0);
+        assert_eq!(scene.height, 720.0);
+        assert_eq!(scene.background, "#0e1017");
+        let layer = &scene.layers[0];
+        assert!(layer.animations[0].to.is_none(), "非有限 to 应被丢弃");
+        assert_eq!(layer.animations[0].start, Some(0.0));
+        assert_eq!(layer.animations[0].end, Some(scene.duration_sec));
+    }
+
+    #[test]
+    fn path_rotation_center_is_computed_from_bbox() {
+        let mut scene: Scene = serde_json::from_str(
+            r#"{ "layers": [{ "shape": { "kind": "path", "d": "M 100 200 L 300 200 L 300 400 Z",
+                 "rotation": 0.5 } }] }"#,
+        )
+        .unwrap();
+        scene.normalize();
+        match &scene.layers[0].shape {
+            Shape::Path { cx, cy, .. } => {
+                assert_eq!(*cx, Some(200.0));
+                assert_eq!(*cy, Some(300.0));
+            }
+            other => panic!("应为 path：{other:?}"),
+        }
+    }
+
+    #[test]
+    fn stroke_width_is_animatable_on_filled_shapes() {
+        let mut circle = Shape::Circle {
+            x: 0.0,
+            y: 0.0,
+            r: 10.0,
+            fill: "#fff".into(),
+            opacity: None,
+            rotation: None,
+            stroke: Some("#f00".into()),
+            stroke_width: Some(2.0),
+        };
+        assert_eq!(circle.get_prop("strokeWidth"), Some(2.0));
+        circle.set_prop("strokeWidth", 6.0);
+        assert_eq!(circle.get_prop("strokeWidth"), Some(6.0));
+        // 旋转现在也适用于 circle / text
+        assert_eq!(circle.get_prop("rotation"), Some(0.0));
+        circle.set_prop("rotation", 1.5);
+        assert_eq!(circle.rotation(), Some(1.5));
+    }
+    #[test]
+    fn evaluate_interpolates_rotation_on_text() {
+        let scene: Scene = serde_json::from_str(
+            r#"{ "durationSec": 2, "layers": [{ "shape": { "kind": "text", "x": 100, "y": 100, "text": "A" },
+                 "animations": [{ "prop": "rotation", "from": 0, "to": 3.14, "start": 0, "end": 2 }] }] }"#,
+        )
+        .unwrap();
+        let mid = &scene.evaluate(1.0)[1];
+        let rot = mid.rotation().unwrap();
+        assert!((rot - 1.57).abs() < 0.01, "1s 处旋转应约为 π/2，实际 {rot}");
+    }
+
+    #[test]
+    fn serde_roundtrip_keeps_new_fields_and_defaults_old() {
+        // 旧版场景 JSON（无新字段）仍能反序列化
+        let old: Scene = serde_json::from_str(
+            r#"{ "layers": [{ "shape": { "kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10 } }] }"#,
+        )
+        .unwrap();
+        assert!(matches!(old.layers[0].shape, Shape::Rect { stroke: None, .. }));
+
+        // 新字段序列化后是 camelCase（strokeWidth 作为 Some(3.0) 才会输出）
+        let s: Scene = serde_json::from_str(
+            r##"{ "layers": [{ "shape": { "kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10,
+                 "stroke": "#f00", "strokeWidth": 3 } }] }"##,
+        )
+        .unwrap();
+        let json = serde_json::to_string(&s).unwrap();
+        assert!(json.contains(r#""strokeWidth":3"#), "实际：{json}");
     }
 }

@@ -38,25 +38,30 @@ function anim(prop, from, to, start, end, easingName) {
 function text(str, x, y, o = {}) {
   return { kind: "text", x, y, text: String(str), size: o.size ?? 48,
            fill: o.fill ?? "#ffffff", opacity: o.opacity ?? 1,
-           align: o.align, baseline: o.baseline };
+           align: o.align, baseline: o.baseline, rotation: o.rotation,
+           stroke: o.stroke, strokeWidth: o.strokeWidth };
 }
 function rect(x, y, w, h, o = {}) {
   return { kind: "rect", x, y, w, h, fill: o.fill ?? "#ffffff", radius: o.radius,
-           opacity: o.opacity ?? 1, rotation: o.rotation };
+           opacity: o.opacity ?? 1, rotation: o.rotation,
+           stroke: o.stroke, strokeWidth: o.strokeWidth };
 }
 function circle(x, y, r, o = {}) {
-  return { kind: "circle", x, y, r, fill: o.fill ?? "#ffffff", opacity: o.opacity ?? 1 };
+  return { kind: "circle", x, y, r, fill: o.fill ?? "#ffffff", opacity: o.opacity ?? 1,
+           rotation: o.rotation, stroke: o.stroke, strokeWidth: o.strokeWidth };
 }
 function ellipse(x, y, rx, ry, o = {}) {
   return { kind: "ellipse", x, y, rx, ry, fill: o.fill ?? "#ffffff",
-           opacity: o.opacity ?? 1, rotation: o.rotation };
+           opacity: o.opacity ?? 1, rotation: o.rotation,
+           stroke: o.stroke, strokeWidth: o.strokeWidth };
 }
 function line(x1, y1, x2, y2, o = {}) {
   return { kind: "line", x1, y1, x2, y2, stroke: o.stroke ?? "#ffffff",
            width: o.width ?? 2, opacity: o.opacity ?? 1 };
 }
 function path(d, o = {}) {
-  return { kind: "path", d, fill: o.fill ?? "#ffffff", opacity: o.opacity ?? 1, rotation: o.rotation };
+  return { kind: "path", d, fill: o.fill ?? "#ffffff", opacity: o.opacity ?? 1, rotation: o.rotation,
+           stroke: o.stroke, strokeWidth: o.strokeWidth };
 }
 function addLayer(shape, animations = []) {
   if (!__scene) throw new Error("请先调用 scene(name, durationSec) 创建场景");
@@ -89,15 +94,19 @@ pub fn run(code: &str) -> Result<Scene, String> {
         .spawn()
         .map_err(|e| format!("启动 {} 失败：{e}", engine.program))?;
 
-    // 单独持有 stdin 便于 drop 触发 EOF
-    {
-        let mut stdin = child.stdin.take().unwrap();
-        stdin
-            .write_all(full.as_bytes())
-            .map_err(|e| format!("写入脚本失败：{e}"))?;
-    }
+    // stdin 写入放独立线程：管道缓冲区写满时不会阻塞主线程的超时轮询
+    let script = full.into_bytes();
+    let mut child_stdin = child.stdin.take();
+    let stdin_thread = std::thread::spawn(move || {
+        if let Some(mut stdin) = child_stdin.take() {
+            let _ = stdin.write_all(&script);
+            // drop(stdin) 触发 EOF
+        }
+    });
 
     let out = wait_with_timeout(child, TIMEOUT)?;
+
+    let _ = stdin_thread.join();
 
     if !out.stderr.trim().is_empty() {
         return Err(truncate_err(&out.stderr));
@@ -162,33 +171,51 @@ struct ProcOut {
 }
 
 fn wait_with_timeout(mut child: std::process::Child, timeout: Duration) -> Result<ProcOut, String> {
+    use std::io::Read;
+
+    // stdout/stderr 各自放独立线程持续读取：脚本输出超过管道缓冲区（约 64KB）
+    // 时，若不消费管道，子进程会阻塞在 write 上；而主线程又在等它退出，互相死锁，
+    // 最后只能误报「执行超时」。读线程保证管道始终被排空。
+    let mut stdout_handle = child.stdout.take();
+    let mut stderr_handle = child.stderr.take();
+    let stdout_thread = std::thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(s) = stdout_handle.as_mut() {
+            let _ = s.read_to_string(&mut buf);
+        }
+        buf
+    });
+    let stderr_thread = std::thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(s) = stderr_handle.as_mut() {
+            let _ = s.read_to_string(&mut buf);
+        }
+        buf
+    });
+
     let start = std::time::Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait().map_err(|e| format!("等待脚本退出失败：{e}"))? {
-            Some(status) => {
-                use std::io::Read;
-                let mut stdout = String::new();
-                let mut stderr = String::new();
-                if let Some(mut s) = child.stdout.take() {
-                    let _ = s.read_to_string(&mut stdout);
-                }
-                if let Some(mut s) = child.stderr.take() {
-                    let _ = s.read_to_string(&mut stderr);
-                }
-                if !status.success() && stderr.trim().is_empty() {
-                    return Err(format!("脚本异常退出（{status}）"));
-                }
-                return Ok(ProcOut { stdout, stderr });
-            }
+            Some(status) => break status,
             None => {
                 if start.elapsed() > timeout {
                     let _ = child.kill();
+                    // 回收子进程避免僵尸；读线程随管道关闭自行结束
+                    let _ = child.wait();
                     return Err(format!("脚本执行超过 {}s，已中止", timeout.as_secs()));
                 }
                 std::thread::sleep(Duration::from_millis(10));
             }
         }
+    };
+
+    let stdout = stdout_thread.join().unwrap_or_default();
+    let stderr = stderr_thread.join().unwrap_or_default();
+
+    if !status.success() && stderr.trim().is_empty() {
+        return Err(format!("脚本异常退出（{status}）"));
     }
+    Ok(ProcOut { stdout, stderr })
 }
 
 fn truncate_err(s: &str) -> String {
@@ -203,6 +230,7 @@ fn truncate_err(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::Shape;
 
     #[test]
     fn runs_simple_script() {
@@ -228,6 +256,30 @@ mod tests {
         match run(code) {
             Ok(_) => panic!("应当失败"),
             Err(e) => assert!(!e.is_empty()),
+        }
+    }
+
+    #[test]
+    fn handles_large_stdout_without_deadlock() {
+        // 管道缓冲区约 64KB；脚本输出远超它时应正常完成而不是误报超时
+        let code = r##"
+            for (let i = 0; i < 2000; i++) console.log("x".repeat(200));
+            const s = scene("大输出", 2);
+            addLayer(circle(10, 10, 5, { stroke: "#fff", strokeWidth: 3 }), []);
+            exportScene(s);
+        "##;
+        match run(code) {
+            Ok(scene) => {
+                assert_eq!(scene.name, "大输出");
+                match &scene.layers[0].shape {
+                    Shape::Circle { stroke, stroke_width, .. } => {
+                        assert_eq!(stroke.as_deref(), Some("#fff"));
+                        assert_eq!(*stroke_width, Some(3.0));
+                    }
+                    other => panic!("应为 circle：{other:?}"),
+                }
+            }
+            Err(e) => assert!(e.contains("JS 引擎"), "非引擎错误: {e}"),
         }
     }
 }

@@ -109,17 +109,17 @@ pub const SYSTEM_PROMPT: &str = r##"你是 LoniceraMograph 的 MG 动画导演�
 坐标系：左上角为原点，x 向右、y 向下，单位像素；画布固定 1280×720。图层按数组顺序绘制，越靠后越在上层。
 
 shape 类型（除标注外字段必填）：
-- rect:    { "kind": "rect", "x", "y", "w", "h", "fill", "radius"?, "opacity"?, "rotation"? }
-- circle:  { "kind": "circle", "x", "y", "r", "fill", "opacity"? }
-- ellipse: { "kind": "ellipse", "x", "y", "rx", "ry", "fill", "opacity"?, "rotation"? }
+- rect:    { "kind": "rect", "x", "y", "w", "h", "fill", "radius"?, "opacity"?, "rotation"?, "stroke"?, "strokeWidth"? }
+- circle:  { "kind": "circle", "x", "y", "r", "fill", "opacity"?, "rotation"?, "stroke"?, "strokeWidth"? }
+- ellipse: { "kind": "ellipse", "x", "y", "rx", "ry", "fill", "opacity"?, "rotation"?, "stroke"?, "strokeWidth"? }
 - line:    { "kind": "line", "x1", "y1", "x2", "y2", "stroke", "width", "opacity"? }
-- text:    { "kind": "text", "x", "y", "text", "size", "fill", "opacity"?, "align"?: "left"|"center"|"right", "baseline"?: "top"|"middle"|"bottom" }
-- path:    { "kind": "path", "d", "fill", "opacity"? }   // d 为 SVG path 数据，坐标用画布绝对坐标
+- text:    { "kind": "text", "x", "y", "text", "size", "fill", "opacity"?, "align"?: "left"|"center"|"right", "baseline"?: "top"|"middle"|"bottom", "rotation"?, "stroke"?, "strokeWidth"? }
+- path:    { "kind": "path", "d", "fill", "opacity"?, "rotation"?, "stroke"?, "strokeWidth"? }   // d 为 SVG path 数据，坐标用画布绝对坐标
 
-颜色使用 CSS 十六进制字符串；rotation 单位为弧度；opacity 取值 0-1。
+颜色使用 CSS 十六进制字符串；rotation 单位为弧度；opacity 取值 0-1。stroke/strokeWidth 可给填充图形加轮廓线（strokeWidth 缺省 2）。
 
 animations 中每项把某个数值属性从 from 补间到 to：
-- 可补间属性：x, y, w, h, r, rx, ry, x1, y1, x2, y2, size, opacity, rotation, radius
+- 可补间属性：x, y, w, h, r, rx, ry, x1, y1, x2, y2, size, opacity, rotation, radius, strokeWidth
 - start / end 单位为秒，缺省 start=0、end=场景时长
 - easing 可选：linear, easeIn, easeOut, easeInOut, easeInCubic, easeOutCubic, easeInOutCubic, easeOutBack, easeOutBounce（缺省 linear）
 - 同一图层可以有多个动画，实现淡入 + 位移 + 缩放等组合
@@ -243,6 +243,13 @@ pub async fn run_agent(
     let mut loaded_scene = false;
     let mut final_text = String::new();
 
+    // 工具上下文在整个 agent 循环中保持：get_scene / get_scene_errors 需要
+    // 读到此前任一步骤加载的场景，而不是只在同一步内可见。
+    let ctx = crate::agent_tools::ToolCtx {
+        app,
+        current_scene: std::sync::Mutex::new(None),
+    };
+
     for _step in 0..max_steps {
         let turn = turn_with_tools(&client, sink, config, &system, &messages, &tools).await?;
         final_text = turn.text.clone();
@@ -262,11 +269,7 @@ pub async fn run_agent(
             tool_call_id: None,
         });
 
-        // 逐个执行工具
-        let ctx = crate::agent_tools::ToolCtx {
-            app,
-            current_scene: std::sync::Mutex::new(None),
-        };
+        // 逐个执行工具（ctx 跨步骤共享）
         for call in calls {
             let id = call
                 .get("id")
@@ -312,8 +315,8 @@ pub async fn run_agent(
             });
         }
 
-        // 把本轮工具实际加载的场景记入 ctx 是按调用新建的；场景状态已由
-        // commands::push_scene 推给前端，这里无需额外处理。
+        // 场景状态已由 commands::push_scene 推给前端；ctx.current_scene
+        // 供后续步骤的 get_scene / get_scene_errors 读取。
     }
 
     Ok((final_text, loaded_scene))
