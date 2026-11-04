@@ -4,7 +4,7 @@
 //! 布局约定：`scenes/*.json` 声明式场景；`scripts/*.js` 代码生成场景。
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -68,13 +68,16 @@ pub fn list(app: &AppHandle, subdir: &str) -> Result<Vec<FileEntry>, String> {
         return Ok(Vec::new());
     }
     let mut out = Vec::new();
-    walk(&base, &mut out)?;
+    walk(&base, &base, &mut out)?;
     out.sort_by(|a, b| a.path.cmp(&b.path));
     out.truncate(MAX_ENTRIES);
     Ok(out)
 }
 
-fn walk(dir: &PathBuf, out: &mut Vec<FileEntry>) -> Result<(), String> {
+/// 递归遍历目录，条目路径为相对 `base` 的工作区路径（多级目录拼接完整前缀）。
+///
+/// 独立于 `AppHandle`，便于对临时目录直接做回归测试。
+fn walk(base: &Path, dir: &Path, out: &mut Vec<FileEntry>) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败：{e}"))?;
     for entry in entries.flatten() {
         let path = entry.path();
@@ -86,8 +89,14 @@ fn walk(dir: &PathBuf, out: &mut Vec<FileEntry>) -> Result<(), String> {
         }
         let is_dir = path.is_dir();
         let meta = entry.metadata().ok();
+        // 完整相对路径：相对 base 逐级拼接，保证 a/b/c.txt 不会被展平成 b/c.txt
+        let rel = path
+            .strip_prefix(base)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
         out.push(FileEntry {
-            path: name_str.clone(),
+            path: rel,
             is_dir,
             size: meta.as_ref().map(|m| m.len()).unwrap_or(0),
         });
@@ -95,13 +104,7 @@ fn walk(dir: &PathBuf, out: &mut Vec<FileEntry>) -> Result<(), String> {
             if out.len() >= MAX_ENTRIES {
                 return Ok(());
             }
-            let sub = path.clone();
-            let before = out.len();
-            let _ = walk(&sub, out);
-            // 子目录条目路径加上目录名前缀
-            for e in &mut out[before..] {
-                e.path = format!("{name_str}/{}", e.path);
-            }
+            walk(base, &path, out)?;
         }
     }
     Ok(())
@@ -182,5 +185,31 @@ mod tests {
             let rel = good.trim().trim_start_matches('/');
             assert!(!rel.split(['/', '\\']).any(|c| c == ".."));
         }
+    }
+
+    #[test]
+    fn walk_keeps_deep_relative_paths() {
+        // 回归：递归列举时条目路径必须保留完整多级前缀，
+        // a/b/c.txt 不能被展平成 b/c.txt（agent 的 read_file 依赖该路径）。
+        let tmp = std::env::temp_dir().join(format!("lonicera-walk-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("a/b")).unwrap();
+        fs::create_dir_all(tmp.join("top")).unwrap();
+        fs::write(tmp.join("a/b/c.txt"), "x").unwrap();
+        fs::write(tmp.join("a/f1.txt"), "x").unwrap();
+        fs::write(tmp.join("top.txt"), "x").unwrap();
+        fs::write(tmp.join("top/deep.js"), "x").unwrap();
+
+        let mut out = Vec::new();
+        walk(&tmp, &tmp, &mut out).unwrap();
+        out.sort_by(|x, y| x.path.cmp(&y.path));
+        let paths: Vec<&str> = out.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(
+            paths,
+            vec!["a", "a/b", "a/b/c.txt", "a/f1.txt", "top", "top.txt", "top/deep.js"]
+        );
+        // 隐藏条目不出现
+        assert!(paths.iter().all(|p| !p.split('/').any(|seg| seg.starts_with('.'))));
+        let _ = fs::remove_dir_all(&tmp);
     }
 }
