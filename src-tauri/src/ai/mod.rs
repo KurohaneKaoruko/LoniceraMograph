@@ -295,7 +295,8 @@ pub async fn run_agent(
             let args = match parse_tool_args(raw_args) {
                 Ok(v) => v,
                 Err(e) => {
-                    let detail = format!("{e}，请修正后重试。原始参数：{}", truncate(raw_args, 300));
+                    let detail =
+                        format!("{e}，请修正后重试。原始参数：{}", truncate(raw_args, 300));
                     let _ = app.emit(
                         "stream",
                         crate::events::StreamEvent::Tool {
@@ -330,7 +331,8 @@ pub async fn run_agent(
             // 工具成功即视作场景已加载（错误统一带「错误：」前缀，不再靠
             // 结果文本是否以「错误」开头反推——场景名恰好以这两个字开头时
             // 曾被误判）。成功标记只认工具名，避免脆弱的字符串约定。
-            if (name == "load_scene" || name == "compile_script") && !result.starts_with("错误：") {
+            let is_error = result.starts_with("错误：");
+            if (name == "load_scene" || name == "compile_script") && !is_error {
                 loaded_scene = true;
             }
 
@@ -370,7 +372,10 @@ fn parse_tool_args(raw: &str) -> Result<serde_json::Value, String> {
     let v: serde_json::Value =
         serde_json::from_str(raw).map_err(|e| format!("工具参数不是合法 JSON：{e}"))?;
     if !v.is_object() {
-        return Err(format!("工具参数应为 JSON 对象，实际为：{}", truncate(&v.to_string(), 80)));
+        return Err(format!(
+            "工具参数应为 JSON 对象，实际为：{}",
+            truncate(&v.to_string(), 80)
+        ));
     }
     Ok(v)
 }

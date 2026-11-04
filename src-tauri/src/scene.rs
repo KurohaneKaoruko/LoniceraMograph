@@ -754,7 +754,10 @@ mod tests {
         assert_eq!(out["durationSec"], 3.0, "durationSec 键名不能变");
         assert_eq!(out["layers"][0]["animations"][0]["easing"], "easeOutCubic");
         let json = out.to_string();
-        assert!(!json.contains("duration_sec"), "场景级 snake_case 回归：{json}");
+        assert!(
+            !json.contains("duration_sec"),
+            "场景级 snake_case 回归：{json}"
+        );
 
         /// 字段名集合必须完全一致（捕获 rename 回归），数值按 f64 语义比较
         ///（serde_json 会区分 `1` 与 `1.0` 的表示，而 Shape 全部数值字段都是 f64）。

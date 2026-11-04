@@ -124,8 +124,8 @@ pub fn run(code: &str) -> Result<Scene, String> {
         })?;
 
     let json = line.trim_start()[SENTINEL.len()..].trim();
-    let mut scene: Scene = serde_json::from_str(json)
-        .map_err(|e| format!("脚本导出的场景不合法：{e}"))?;
+    let mut scene: Scene =
+        serde_json::from_str(json).map_err(|e| format!("脚本导出的场景不合法：{e}"))?;
     if scene.layers.is_empty() {
         return Err("脚本生成的场景没有任何图层".into());
     }
