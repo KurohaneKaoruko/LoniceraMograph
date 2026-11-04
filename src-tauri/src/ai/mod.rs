@@ -242,6 +242,8 @@ pub async fn run_agent(
 
     let mut loaded_scene = false;
     let mut final_text = String::new();
+    // 12 步全部用来调工具、始终没给出最终回答时置 true。
+    let mut ran_out = true;
 
     // 工具上下文在整个 agent 循环中保持：get_scene / get_scene_errors 需要
     // 读到此前任一步骤加载的场景，而不是只在同一步内可见。
@@ -257,6 +259,7 @@ pub async fn run_agent(
         let calls = turn.tool_calls.as_array().cloned().unwrap_or_default();
         if calls.is_empty() {
             // 模型给出最终回答，循环结束
+            ran_out = false;
             break;
         }
 
@@ -285,8 +288,31 @@ pub async fn run_agent(
                 .pointer("/function/arguments")
                 .and_then(|v| v.as_str())
                 .unwrap_or("{}");
-            let args: serde_json::Value =
-                serde_json::from_str(raw_args).unwrap_or(serde_json::json!({}));
+
+            // 参数不是合法 JSON 时不再静默回退空参数：那样工具只会报
+            // 「缺少 path」之类表面原因，模型无从得知真实错误。把解析
+            // 错误直接回传，模型下一轮可自行修正。
+            let args = match parse_tool_args(raw_args) {
+                Ok(v) => v,
+                Err(e) => {
+                    let detail = format!("{e}，请修正后重试。原始参数：{}", truncate(raw_args, 300));
+                    let _ = app.emit(
+                        "stream",
+                        crate::events::StreamEvent::Tool {
+                            name: name.clone(),
+                            detail: tool_detail(&name, &serde_json::json!({})),
+                        },
+                    );
+                    messages.push(ChatMessage {
+                        role: "tool".into(),
+                        content: format!("错误：{detail}"),
+                        tool_calls: None,
+                        name: Some(name),
+                        tool_call_id: Some(id),
+                    });
+                    continue;
+                }
+            };
 
             // 前端展示工具活动
             let _ = app.emit(
@@ -301,7 +327,10 @@ pub async fn run_agent(
                 Ok(text) => text,
                 Err(e) => format!("错误：{e}"),
             };
-            if (name == "load_scene" || name == "compile_script") && !result.starts_with("错误") {
+            // 工具成功即视作场景已加载（错误统一带「错误：」前缀，不再靠
+            // 结果文本是否以「错误」开头反推——场景名恰好以这两个字开头时
+            // 曾被误判）。成功标记只认工具名，避免脆弱的字符串约定。
+            if (name == "load_scene" || name == "compile_script") && !result.starts_with("错误：") {
                 loaded_scene = true;
             }
 
@@ -319,7 +348,31 @@ pub async fn run_agent(
         // 供后续步骤的 get_scene / get_scene_errors 读取。
     }
 
+    // 步数用尽且模型始终没给出最终文本：告知前端，而不是让最后一轮的
+    // 工具结果留在气泡里、用户面对无声的「完成」。
+    if ran_out && final_text.trim().is_empty() {
+        return Err(format!(
+            "已连续执行 {max_steps} 步仍未完成任务，已停止。请把需求拆小后重试。"
+        ));
+    }
+
     Ok((final_text, loaded_scene))
+}
+
+/// 解析工具调用参数：空串视作空对象，其余必须为合法 JSON 对象。
+///
+/// 部分模型会输出空字符串参数；`serde_json` 原样解析会失败，这里归一化。
+fn parse_tool_args(raw: &str) -> Result<serde_json::Value, String> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    let v: serde_json::Value =
+        serde_json::from_str(raw).map_err(|e| format!("工具参数不是合法 JSON：{e}"))?;
+    if !v.is_object() {
+        return Err(format!("工具参数应为 JSON 对象，实际为：{}", truncate(&v.to_string(), 80)));
+    }
+    Ok(v)
 }
 
 /// 工具活动在前端的简短描述。
@@ -493,6 +546,23 @@ mod tests {
     fn ignores_invalid_and_empty_scenes() {
         assert!(extract_scene("没有 JSON").is_none());
         assert!(extract_scene(r#"{"name":"x","layers":[]}"#).is_none());
+    }
+
+    #[test]
+    fn parse_tool_args_normalizes_and_validates() {
+        // 空参数（部分模型会输出空串）归一化为空对象
+        assert_eq!(parse_tool_args("").unwrap(), serde_json::json!({}));
+        assert_eq!(parse_tool_args("  \n").unwrap(), serde_json::json!({}));
+        assert_eq!(
+            parse_tool_args(r#"{"path":"scenes/a.json"}"#).unwrap(),
+            serde_json::json!({ "path": "scenes/a.json" })
+        );
+        // 非法 JSON：报错且信息含解析原因，而不是静默回退空参数
+        let err = parse_tool_args(r#"{"path": }"#).unwrap_err();
+        assert!(err.contains("不是合法 JSON"), "错误信息: {err}");
+        // 非 JSON 对象（数组/标量）同样拒绝
+        assert!(parse_tool_args("[1,2]").is_err());
+        assert!(parse_tool_args("42").is_err());
     }
 
     #[test]
