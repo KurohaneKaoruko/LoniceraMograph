@@ -395,12 +395,12 @@ mod tests {
         // 回归：which() 必须自行扫描 PATH，而不是调用外部 which 命令——
         // Windows 上没有 which，旧实现必然失败，JS 引擎会永远找不到。
         // 类 Unix 测试环境里 sh/bash 一定在 PATH 中。
-        assert!(
-            which("sh") || which("bash"),
-            "应在 PATH 中找到 sh 或 bash"
-        );
+        assert!(which("sh") || which("bash"), "应在 PATH 中找到 sh 或 bash");
         // 含路径分隔符时按字面路径检查
-        assert!(which("/bin/sh") || which("/usr/bin/sh"), "字面路径应可直接命中");
+        assert!(
+            which("/bin/sh") || which("/usr/bin/sh"),
+            "字面路径应可直接命中"
+        );
         // 不存在的程序返回 false，不 panic
         assert!(!which("lonicera-definitely-not-a-real-binary-xyz"));
         // 目录不是可执行文件，不能命中

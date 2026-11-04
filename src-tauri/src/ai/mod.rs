@@ -694,11 +694,21 @@ mod tests {
         let out = recent_history(&history);
         let roles: Vec<&str> = out.iter().map(|m| m.role.as_str()).collect();
         // 不应以 tool 回复开头
-        assert_ne!(roles.first(), Some(&"tool"), "裁剪后以 tool 开头: {roles:?}");
+        assert_ne!(
+            roles.first(),
+            Some(&"tool"),
+            "裁剪后以 tool 开头: {roles:?}"
+        );
         // 若保留了 assistant(tool_calls)，其全部 tool 回复必须同时保留
         let declared: Vec<String> = out
             .iter()
-            .flat_map(|m| m.tool_calls.as_ref().and_then(|v| v.as_array()).cloned().unwrap_or_default())
+            .flat_map(|m| {
+                m.tool_calls
+                    .as_ref()
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_default()
+            })
             .filter_map(|c| c.get("id").and_then(|v| v.as_str()).map(String::from))
             .collect();
         for m in &out {
@@ -711,17 +721,24 @@ mod tests {
             }
         }
         // 完整工具链要么整体在、要么整体不在
-        let has_a = out.iter().any(|m| m.role == "tool" && m.tool_call_id.as_deref() == Some("call_a"));
+        let has_a = out
+            .iter()
+            .any(|m| m.role == "tool" && m.tool_call_id.as_deref() == Some("call_a"));
         let has_call = out.iter().any(|m| {
             m.role == "assistant"
                 && m.tool_calls
                     .as_ref()
                     .and_then(|v| v.as_array())
                     .is_some_and(|calls| {
-                        calls.iter().any(|c| c.get("id").and_then(|v| v.as_str()) == Some("call_a"))
+                        calls
+                            .iter()
+                            .any(|c| c.get("id").and_then(|v| v.as_str()) == Some("call_a"))
                     })
         });
-        assert_eq!(has_a, has_call, "assistant(tool_calls) 与 tool 回复被拆开: {roles:?}");
+        assert_eq!(
+            has_a, has_call,
+            "assistant(tool_calls) 与 tool 回复被拆开: {roles:?}"
+        );
     }
 
     #[test]
@@ -735,7 +752,9 @@ mod tests {
         history.push(ChatMessage::text("user", "latest"));
 
         let out = recent_history(&history);
-        assert!(out.iter().any(|m| m.role == "assistant" && m.tool_calls.is_some()));
+        assert!(out
+            .iter()
+            .any(|m| m.role == "assistant" && m.tool_calls.is_some()));
         assert!(out.iter().any(|m| m.role == "tool"));
         // 起点没有落在 tool 消息上 → 未过度回退
         assert_eq!(out.len(), 12);

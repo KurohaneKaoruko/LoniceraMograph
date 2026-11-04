@@ -206,10 +206,20 @@ mod tests {
         let paths: Vec<&str> = out.iter().map(|e| e.path.as_str()).collect();
         assert_eq!(
             paths,
-            vec!["a", "a/b", "a/b/c.txt", "a/f1.txt", "top", "top.txt", "top/deep.js"]
+            vec![
+                "a",
+                "a/b",
+                "a/b/c.txt",
+                "a/f1.txt",
+                "top",
+                "top.txt",
+                "top/deep.js"
+            ]
         );
         // 隐藏条目不出现
-        assert!(paths.iter().all(|p| !p.split('/').any(|seg| seg.starts_with('.'))));
+        assert!(paths
+            .iter()
+            .all(|p| !p.split('/').any(|seg| seg.starts_with('.'))));
         let _ = fs::remove_dir_all(&tmp);
     }
 }
