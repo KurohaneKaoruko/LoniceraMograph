@@ -7,6 +7,7 @@
 //! 沙箱措施：`node --permission` 禁止文件系统/子进程/原生模块访问，
 //! 超时 3 秒，输入输出只走 stdin/stdout JSON。
 
+use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -165,12 +166,69 @@ fn find_engine() -> Option<Engine> {
     None
 }
 
+/// 判断可执行文件是否在 PATH 中（跨平台）。
+///
+/// 不再调用外部 `which`（Windows 没有）：
+/// 按 PATH 逐目录查找，Windows 额外尝试 PATHEXT 里声明的可执行后缀。
 fn which(prog: &str) -> bool {
-    Command::new("which")
-        .arg(prog)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    // 约定俗成：含路径分隔符时直接按字面路径检查
+    if prog.contains('/') || prog.contains('\\') {
+        return is_executable_file(std::path::Path::new(prog));
+    }
+    let path_env = std::env::var_os("PATH").unwrap_or_default();
+    let exts: Vec<String> = if cfg!(windows) {
+        match std::env::var("PATHEXT") {
+            Ok(v) => v
+                .split(';')
+                .filter(|e| !e.is_empty())
+                .map(|e| e.to_ascii_lowercase())
+                .collect(),
+            Err(_) => vec![".exe".into(), ".cmd".into(), ".bat".into()],
+        }
+    } else {
+        vec![String::new()]
+    };
+    let prog_lower = prog.to_ascii_lowercase();
+    for dir in std::env::split_paths(&path_env) {
+        for ext in &exts {
+            // Windows 上「node.exe」也能命中 PATH 里的 node；类 Unix 忽略显式后缀
+            let candidate = if ext.is_empty() {
+                dir.join(prog)
+            } else {
+                dir.join(format!("{prog}{ext}"))
+            };
+            if is_executable_file(&candidate) {
+                return true;
+            }
+            // Windows：不带后缀的精确文件也算（罕见但合法）
+            if cfg!(windows) && ext != &".exe" && prog_lower.ends_with(ext.as_str()) {
+                let bare = dir.join(prog);
+                if is_executable_file(&bare) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn is_executable_file(path: &std::path::Path) -> bool {
+    let Ok(meta) = fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_file() {
+        return false;
+    }
+    // 类 Unix 还要求可执行位
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        meta.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
 }
 
 struct ProcOut {
@@ -330,5 +388,22 @@ mod tests {
             }
             Err(e) => assert!(e.contains("JS 引擎"), "非引擎错误: {e}"),
         }
+    }
+
+    #[test]
+    fn which_scans_path_without_external_binary() {
+        // 回归：which() 必须自行扫描 PATH，而不是调用外部 which 命令——
+        // Windows 上没有 which，旧实现必然失败，JS 引擎会永远找不到。
+        // 类 Unix 测试环境里 sh/bash 一定在 PATH 中。
+        assert!(
+            which("sh") || which("bash"),
+            "应在 PATH 中找到 sh 或 bash"
+        );
+        // 含路径分隔符时按字面路径检查
+        assert!(which("/bin/sh") || which("/usr/bin/sh"), "字面路径应可直接命中");
+        // 不存在的程序返回 false，不 panic
+        assert!(!which("lonicera-definitely-not-a-real-binary-xyz"));
+        // 目录不是可执行文件，不能命中
+        assert!(!which("/tmp"));
     }
 }
