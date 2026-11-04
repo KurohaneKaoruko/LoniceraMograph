@@ -688,4 +688,94 @@ mod tests {
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains(r#""strokeWidth":3"#), "实际：{json}");
     }
+
+    #[test]
+    fn serde_field_names_match_frontend_protocol() {
+        // 回归锁定：serde 的 rename_all = "camelCase" 只作用于 enum variant
+        // 名，不作用于 struct variant 内部字段——strokeWidth 等驼峰字段曾因此
+        // 静默丢失（写入 snake_case，前端/脚本 JSON 全部读不到）。逐 shape
+        // 验证全字段 round-trip 后键名不变，任何一处改回 snake_case 都会在此
+        // 失败。
+        let cases: &[(&str, &str)] = &[
+            (
+                "rect",
+                r##"{ "kind": "rect", "x": 1, "y": 2, "w": 3, "h": 4, "fill": "#111",
+                     "radius": 5, "opacity": 0.5, "rotation": 6, "stroke": "#222", "strokeWidth": 7 }"##,
+            ),
+            (
+                "circle",
+                r##"{ "kind": "circle", "x": 1, "y": 2, "r": 3, "fill": "#111",
+                     "opacity": 0.5, "rotation": 6, "stroke": "#222", "strokeWidth": 7 }"##,
+            ),
+            (
+                "ellipse",
+                r##"{ "kind": "ellipse", "x": 1, "y": 2, "rx": 3, "ry": 4, "fill": "#111",
+                     "opacity": 0.5, "rotation": 6, "stroke": "#222", "strokeWidth": 7 }"##,
+            ),
+            (
+                "line",
+                r##"{ "kind": "line", "x1": 1, "y1": 2, "x2": 3, "y2": 4, "stroke": "#222",
+                     "width": 5, "opacity": 0.5 }"##,
+            ),
+            (
+                "text",
+                r##"{ "kind": "text", "x": 1, "y": 2, "text": "你好", "size": 3, "fill": "#111",
+                     "opacity": 0.5, "rotation": 6, "stroke": "#222", "strokeWidth": 7,
+                     "align": "center", "baseline": "middle" }"##,
+            ),
+            (
+                "path",
+                r##"{ "kind": "path", "d": "M 0 0 L 10 10", "fill": "#111", "opacity": 0.5,
+                     "rotation": 6, "stroke": "#222", "strokeWidth": 7, "cx": 5, "cy": 5 }"##,
+            ),
+        ];
+        for (kind, shape_json) in cases {
+            let orig: serde_json::Value = serde_json::from_str(shape_json).unwrap();
+            let shape: Shape = serde_json::from_str(shape_json).unwrap();
+            let out: serde_json::Value = serde_json::to_value(&shape).unwrap();
+            assert_json_equivalent(kind, &orig, &out);
+            // 直接的 snake_case 绊线：任何字段改回 snake 命名都会出现在这里
+            let json = out.to_string();
+            assert!(
+                !json.contains("stroke_width") && !json.contains("strokeWidth_"),
+                "{kind} 疑似 snake_case 命名回归：{json}"
+            );
+        }
+
+        // 场景级驼峰字段（durationSec 等）与 Animation 的 camelCase 命名
+        let scene: Scene = serde_json::from_str(
+            r#"{ "name": "n", "durationSec": 3, "width": 100, "height": 50,
+                 "layers": [{ "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1, "h": 1 },
+                 "animations": [{ "prop": "x", "from": 0, "to": 1,
+                                  "start": 0.1, "end": 2.9, "easing": "easeOutCubic" }] }] }"#,
+        )
+        .unwrap();
+        let out: serde_json::Value = serde_json::to_value(&scene).unwrap();
+        assert_eq!(out["durationSec"], 3.0, "durationSec 键名不能变");
+        assert_eq!(out["layers"][0]["animations"][0]["easing"], "easeOutCubic");
+        let json = out.to_string();
+        assert!(!json.contains("duration_sec"), "场景级 snake_case 回归：{json}");
+
+        /// 字段名集合必须完全一致（捕获 rename 回归），数值按 f64 语义比较
+        ///（serde_json 会区分 `1` 与 `1.0` 的表示，而 Shape 全部数值字段都是 f64）。
+        fn assert_json_equivalent(kind: &str, orig: &serde_json::Value, out: &serde_json::Value) {
+            let (o, u) = match (orig.as_object(), out.as_object()) {
+                (Some(o), Some(u)) => (o, u),
+                _ => panic!("{kind} round-trip 后应为 JSON 对象"),
+            };
+            let mut okeys: Vec<_> = o.keys().collect();
+            let mut ukeys: Vec<_> = u.keys().collect();
+            okeys.sort_unstable();
+            ukeys.sort_unstable();
+            assert_eq!(okeys, ukeys, "{kind} 字段名不一致（serde rename 回归？）");
+            for k in okeys {
+                let (ov, uv) = (&o[k], &u[k]);
+                let eq = match (ov.as_f64(), uv.as_f64()) {
+                    (Some(a), Some(b)) => a == b,
+                    _ => ov == uv,
+                };
+                assert!(eq, "{kind}.{k} 值不一致：{ov} vs {uv}");
+            }
+        }
+    }
 }
