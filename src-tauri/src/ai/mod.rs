@@ -433,17 +433,24 @@ fn tool_detail(name: &str, args: &serde_json::Value) -> String {
 }
 
 /// 只带最近若干轮，避免上下文过长。
+///
+/// 裁剪时必须保持 OpenAI/Anthropic 的消息配对完整性：
+/// assistant(tool_calls) 与其后所有对应 tool 回复要么整体保留，要么整体丢弃，
+/// 否则 API 会以「tool_call_id 无对应 tool_calls」直接拒绝整个请求。
 fn recent_history(history: &[ChatMessage]) -> Vec<ChatMessage> {
     const MAX_MESSAGES: usize = 12;
     const MAX_CHARS: usize = 12_000;
 
-    let mut out: Vec<ChatMessage> = history
-        .iter()
-        .rev()
-        .take(MAX_MESSAGES)
-        .rev()
-        .cloned()
-        .collect();
+    // 先按条数粗裁，再向左回退：若裁剪边界落进一组工具链中段
+    // （起点是 tool 消息，或 assistant(tool_calls) 与其 tool 回复被拆开），
+    // 继续丢弃更早的消息，直到边界对齐到安全位置。
+    let end = history.len();
+    let mut start = end.saturating_sub(MAX_MESSAGES);
+    while start < end && breaks_tool_pairing(history, start, end) {
+        start += 1;
+    }
+
+    let mut out: Vec<ChatMessage> = history[start..end].to_vec();
 
     for msg in &mut out {
         if msg.content.chars().count() > MAX_CHARS {
@@ -451,6 +458,44 @@ fn recent_history(history: &[ChatMessage]) -> Vec<ChatMessage> {
         }
     }
     out
+}
+
+/// 判断 `[start, end)` 是否切开了某组 assistant(tool_calls) ↔ tool 回复。
+///
+/// 规则：切片起点不得是 tool 消息（其上游 assistant 已被裁掉）；
+/// 若起前区间内存在 assistant(tool_calls)，其所有 tool 回复必须都在区间内。
+fn breaks_tool_pairing(msgs: &[ChatMessage], start: usize, end: usize) -> bool {
+    if start >= end || start == 0 {
+        return false;
+    }
+    // 起点直接是 tool 回复：说明对应的 assistant(tool_calls) 被裁掉了
+    if msgs[start].role == "tool" {
+        return true;
+    }
+    // 收集区间内 assistant 消息声明的全部 tool_call id，
+    // 区间内出现任一 id 的 tool 回复而没有对应声明 → 配对被切开
+    let mut declared: Vec<String> = Vec::new();
+    for msg in &msgs[start..end] {
+        if msg.role == "assistant" {
+            if let Some(calls) = msg.tool_calls.as_ref().and_then(|v| v.as_array()) {
+                for c in calls {
+                    if let Some(id) = c.get("id").and_then(|v| v.as_str()) {
+                        declared.push(id.to_string());
+                    }
+                }
+            }
+        }
+    }
+    for msg in &msgs[start..end] {
+        if msg.role == "tool" {
+            if let Some(id) = msg.tool_call_id.as_ref() {
+                if !declared.iter().any(|d| d == id) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 /// 从模型回复中提取场景 JSON，容忍代码块、前后说明文字。
@@ -607,5 +652,100 @@ mod tests {
             endpoint("", "https://api.openai.com/v1", "/chat/completions"),
             "https://api.openai.com/v1/chat/completions"
         );
+    }
+
+    /// 构造一条 assistant(tool_calls) 消息。
+    fn assistant_with_calls(ids: &[&str]) -> ChatMessage {
+        ChatMessage {
+            role: "assistant".into(),
+            content: String::new(),
+            tool_calls: Some(serde_json::Value::Array(
+                ids.iter()
+                    .map(|id| serde_json::json!({ "id": id, "type": "function" }))
+                    .collect(),
+            )),
+            name: None,
+            tool_call_id: None,
+        }
+    }
+
+    /// 构造一条 tool 回复消息。
+    fn tool_reply(id: &str) -> ChatMessage {
+        ChatMessage {
+            role: "tool".into(),
+            content: "ok".into(),
+            tool_calls: None,
+            name: None,
+            tool_call_id: Some(id.into()),
+        }
+    }
+
+    #[test]
+    fn recent_history_never_splits_tool_pairing() {
+        // 12 条普通消息 + 一组完整工具链（assistant + 2 条 tool 回复）。
+        // 粗裁会恰好切在工具链开头，必须回退到工具链之前。
+        let mut history: Vec<ChatMessage> = (0..12)
+            .map(|i| ChatMessage::text("user", format!("u{i}")))
+            .collect();
+        history.push(assistant_with_calls(&["call_a", "call_b"]));
+        history.push(tool_reply("call_a"));
+        history.push(tool_reply("call_b"));
+
+        let out = recent_history(&history);
+        let roles: Vec<&str> = out.iter().map(|m| m.role.as_str()).collect();
+        // 不应以 tool 回复开头
+        assert_ne!(roles.first(), Some(&"tool"), "裁剪后以 tool 开头: {roles:?}");
+        // 若保留了 assistant(tool_calls)，其全部 tool 回复必须同时保留
+        let declared: Vec<String> = out
+            .iter()
+            .flat_map(|m| m.tool_calls.as_ref().and_then(|v| v.as_array()).cloned().unwrap_or_default())
+            .filter_map(|c| c.get("id").and_then(|v| v.as_str()).map(String::from))
+            .collect();
+        for m in &out {
+            if m.role == "tool" {
+                let id = m.tool_call_id.as_deref().unwrap_or_default();
+                assert!(
+                    declared.iter().any(|d| d == id),
+                    "tool 回复 {id} 的上游 assistant 被裁掉: {roles:?}"
+                );
+            }
+        }
+        // 完整工具链要么整体在、要么整体不在
+        let has_a = out.iter().any(|m| m.role == "tool" && m.tool_call_id.as_deref() == Some("call_a"));
+        let has_call = out.iter().any(|m| {
+            m.role == "assistant"
+                && m.tool_calls
+                    .as_ref()
+                    .and_then(|v| v.as_array())
+                    .is_some_and(|calls| {
+                        calls.iter().any(|c| c.get("id").and_then(|v| v.as_str()) == Some("call_a"))
+                    })
+        });
+        assert_eq!(has_a, has_call, "assistant(tool_calls) 与 tool 回复被拆开: {roles:?}");
+    }
+
+    #[test]
+    fn recent_history_drops_orphan_chain_without_over_trim() {
+        // 尾部是完整工具链 + 一条普通消息：正常裁剪不受影响，仍保留 12 条
+        let mut history: Vec<ChatMessage> = (0..11)
+            .map(|i| ChatMessage::text("user", format!("u{i}")))
+            .collect();
+        history.push(assistant_with_calls(&["call_x"]));
+        history.push(tool_reply("call_x"));
+        history.push(ChatMessage::text("user", "latest"));
+
+        let out = recent_history(&history);
+        assert!(out.iter().any(|m| m.role == "assistant" && m.tool_calls.is_some()));
+        assert!(out.iter().any(|m| m.role == "tool"));
+        // 起点没有落在 tool 消息上 → 未过度回退
+        assert_eq!(out.len(), 12);
+    }
+
+    #[test]
+    fn recent_history_trims_long_content() {
+        let long = "测".repeat(20_000);
+        let history = vec![ChatMessage::text("user", long)];
+        let out = recent_history(&history);
+        assert_eq!(out[0].content.chars().count(), 12_000);
     }
 }
