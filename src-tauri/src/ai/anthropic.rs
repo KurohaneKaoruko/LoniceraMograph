@@ -56,8 +56,14 @@ fn build_messages(history: &[ChatMessage], user_message: Option<&str>) -> Vec<Va
                 }
                 if let Some(tcs) = msg.tool_calls.as_ref().and_then(|v| v.as_array()) {
                     for tc in tcs {
-                        let name = tc.pointer("/function/name").and_then(|v| v.as_str()).unwrap_or("");
-                        let args_str = tc.pointer("/function/arguments").and_then(|v| v.as_str()).unwrap_or("{}");
+                        let name = tc
+                            .pointer("/function/name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let args_str = tc
+                            .pointer("/function/arguments")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("{}");
                         let input: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
                         blocks.push(json!({
                             "type": "tool_use",
@@ -70,7 +76,11 @@ fn build_messages(history: &[ChatMessage], user_message: Option<&str>) -> Vec<Va
                 messages.push(json!({ "role": "assistant", "content": blocks }));
             }
             role => {
-                let role = if role == "assistant" { "assistant" } else { "user" };
+                let role = if role == "assistant" {
+                    "assistant"
+                } else {
+                    "user"
+                };
                 // 合并相邻同角色消息（Anthropic 要求交替）
                 let mergeable = messages.last().is_some_and(|last| {
                     last.get("role").and_then(|r| r.as_str()) == Some(role)
@@ -167,26 +177,41 @@ async fn do_stream(
             return;
         };
         match value.get("type").and_then(|v| v.as_str()) {
-            Some("content_block_delta") => match value.pointer("/delta/type").and_then(|v| v.as_str()) {
-                Some("text_delta") => {
-                    if let Some(text) = value.pointer("/delta/text").and_then(|v| v.as_str()) {
-                        if !text.is_empty() {
-                            acc.push_str(text);
-                            sink.delta(text);
+            Some("content_block_delta") => {
+                match value.pointer("/delta/type").and_then(|v| v.as_str()) {
+                    Some("text_delta") => {
+                        if let Some(text) = value.pointer("/delta/text").and_then(|v| v.as_str()) {
+                            if !text.is_empty() {
+                                acc.push_str(text);
+                                sink.delta(text);
+                            }
                         }
                     }
-                }
-                Some("input_json_delta") => {
-                    let idx = value.pointer("/index").and_then(|v| v.as_u64()).unwrap_or(0);
-                    if let Some(partial) = value.pointer("/delta/partial_json").and_then(|v| v.as_str()) {
-                        tool_acc.entry(idx).or_default().2.push_str(partial);
+                    Some("input_json_delta") => {
+                        let idx = value
+                            .pointer("/index")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0);
+                        if let Some(partial) = value
+                            .pointer("/delta/partial_json")
+                            .and_then(|v| v.as_str())
+                        {
+                            tool_acc.entry(idx).or_default().2.push_str(partial);
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             Some("content_block_start") => {
-                if value.pointer("/content_block/type").and_then(|v| v.as_str()) == Some("tool_use") {
-                    let idx = value.pointer("/index").and_then(|v| v.as_u64()).unwrap_or(0);
+                if value
+                    .pointer("/content_block/type")
+                    .and_then(|v| v.as_str())
+                    == Some("tool_use")
+                {
+                    let idx = value
+                        .pointer("/index")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
                     let id = value
                         .pointer("/content_block/id")
                         .and_then(|v| v.as_str())
@@ -247,9 +272,17 @@ pub async fn stream(
     history: &[ChatMessage],
     user_message: &str,
 ) -> Result<String, String> {
-    do_stream(client, sink, config, system, history, Some(user_message), None)
-        .await
-        .map(|t| t.text)
+    do_stream(
+        client,
+        sink,
+        config,
+        system,
+        history,
+        Some(user_message),
+        None,
+    )
+    .await
+    .map(|t| t.text)
 }
 
 /// agent 轮次：流式输出 + 工具调用收集。

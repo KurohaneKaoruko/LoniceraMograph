@@ -280,9 +280,7 @@ impl Shape {
             (Shape::Rect { w, .. }, "w") => Some(*w),
             (Shape::Rect { h, .. }, "h") => Some(*h),
             (Shape::Rect { radius, .. }, "radius") => Some(radius.unwrap_or(0.0)),
-            (Shape::Rect { stroke_width, .. }, "strokeWidth") => {
-                Some(stroke_width.unwrap_or(0.0))
-            }
+            (Shape::Rect { stroke_width, .. }, "strokeWidth") => Some(stroke_width.unwrap_or(0.0)),
 
             (Shape::Circle { x, .. }, "x") => Some(*x),
             (Shape::Circle { y, .. }, "y") => Some(*y),
@@ -309,9 +307,7 @@ impl Shape {
             (Shape::Text { y, .. }, "y") => Some(*y),
             (Shape::Text { size, .. }, "size") => Some(*size),
 
-            (Shape::Path { stroke_width, .. }, "strokeWidth") => {
-                Some(stroke_width.unwrap_or(0.0))
-            }
+            (Shape::Path { stroke_width, .. }, "strokeWidth") => Some(stroke_width.unwrap_or(0.0)),
 
             (_, "opacity") => Some(self.opacity().unwrap_or(1.0)),
             (_, "rotation") => Some(self.rotation().unwrap_or(0.0)),
@@ -370,16 +366,14 @@ impl Shape {
                     | Shape::Path { opacity, .. } => *opacity = Some(v),
                 }
             }
-            (_, "rotation") => {
-                match self {
-                    Shape::Rect { rotation, .. }
-                    | Shape::Circle { rotation, .. }
-                    | Shape::Ellipse { rotation, .. }
-                    | Shape::Text { rotation, .. }
-                    | Shape::Path { rotation, .. } => *rotation = Some(value),
-                    _ => {}
-                }
-            }
+            (_, "rotation") => match self {
+                Shape::Rect { rotation, .. }
+                | Shape::Circle { rotation, .. }
+                | Shape::Ellipse { rotation, .. }
+                | Shape::Text { rotation, .. }
+                | Shape::Path { rotation, .. } => *rotation = Some(value),
+                _ => {}
+            },
             _ => {}
         }
     }
@@ -417,7 +411,8 @@ fn path_bbox(d: &str) -> (f64, f64, f64, f64) {
         let bytes = d.as_bytes();
         let mut i = 0;
         while i < bytes.len() {
-            if bytes[i].is_ascii_digit() || bytes[i] == b'-' || bytes[i] == b'+' || bytes[i] == b'.' {
+            if bytes[i].is_ascii_digit() || bytes[i] == b'-' || bytes[i] == b'+' || bytes[i] == b'.'
+            {
                 let start = i;
                 while i < bytes.len()
                     && (bytes[i].is_ascii_digit()
@@ -435,8 +430,12 @@ fn path_bbox(d: &str) -> (f64, f64, f64, f64) {
         out
     }
 
-    let (mut min_x, mut min_y, mut max_x, mut max_y) =
-        (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    );
     for pair in nums(d).chunks(2) {
         if pair.len() == 2 {
             min_x = min_x.min(pair[0]);
@@ -677,7 +676,10 @@ mod tests {
             r#"{ "layers": [{ "shape": { "kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10 } }] }"#,
         )
         .unwrap();
-        assert!(matches!(old.layers[0].shape, Shape::Rect { stroke: None, .. }));
+        assert!(matches!(
+            old.layers[0].shape,
+            Shape::Rect { stroke: None, .. }
+        ));
 
         // 新字段序列化后是 camelCase（strokeWidth 作为 Some(3.0) 才会输出）
         let s: Scene = serde_json::from_str(

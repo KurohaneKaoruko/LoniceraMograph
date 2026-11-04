@@ -30,8 +30,7 @@ fn build_messages(system: &str, history: &[ChatMessage], user_message: Option<&s
                                 .pointer("/function/arguments")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("{}");
-                            let args: Value =
-                                serde_json::from_str(args_str).unwrap_or(json!({}));
+                            let args: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
                             json!({ "function": { "name": name, "arguments": args } })
                         })
                         .collect();
@@ -40,7 +39,11 @@ fn build_messages(system: &str, history: &[ChatMessage], user_message: Option<&s
                 messages.push(m);
             }
             role => {
-                let role = if role == "assistant" { "assistant" } else { "user" };
+                let role = if role == "assistant" {
+                    "assistant"
+                } else {
+                    "user"
+                };
                 messages.push(json!({ "role": role, "content": msg.content }));
             }
         }
@@ -77,12 +80,10 @@ async fn do_stream(
         body["tools"] = tools.clone();
     }
 
-    let resp = client
-        .post(&url)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("连接 Ollama（{url}）失败：{e}。请确认 `ollama serve` 已启动。"))?;
+    let resp =
+        client.post(&url).json(&body).send().await.map_err(|e| {
+            format!("连接 Ollama（{url}）失败：{e}。请确认 `ollama serve` 已启动。")
+        })?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -115,7 +116,10 @@ async fn do_stream(
                 sink.delta(text);
             }
         }
-        if let Some(tcs) = value.pointer("/message/tool_calls").and_then(|v| v.as_array()) {
+        if let Some(tcs) = value
+            .pointer("/message/tool_calls")
+            .and_then(|v| v.as_array())
+        {
             for tc in tcs {
                 let name = tc
                     .pointer("/function/name")
@@ -160,9 +164,17 @@ pub async fn stream(
     history: &[ChatMessage],
     user_message: &str,
 ) -> Result<String, String> {
-    do_stream(client, sink, config, system, history, Some(user_message), None)
-        .await
-        .map(|t| t.text)
+    do_stream(
+        client,
+        sink,
+        config,
+        system,
+        history,
+        Some(user_message),
+        None,
+    )
+    .await
+    .map(|t| t.text)
 }
 
 /// agent 轮次：流式输出 + 工具调用收集。

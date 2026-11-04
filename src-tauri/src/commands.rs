@@ -109,7 +109,10 @@ pub async fn chat(
 
 /// 列出工作区文件。
 #[tauri::command]
-pub fn list_files(app: AppHandle, path: Option<String>) -> Result<Vec<crate::workspace::FileEntry>, String> {
+pub fn list_files(
+    app: AppHandle,
+    path: Option<String>,
+) -> Result<Vec<crate::workspace::FileEntry>, String> {
     crate::workspace::list(&app, path.as_deref().unwrap_or(""))
 }
 

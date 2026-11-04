@@ -20,10 +20,7 @@ fn anim(prop: &str, from: f64, to: f64, start: f64, end: f64, easing: Easing) ->
 }
 
 fn animated(shape: Shape, animations: Vec<Animation>) -> Layer {
-    Layer {
-        shape,
-        animations,
-    }
+    Layer { shape, animations }
 }
 
 fn text(x: f64, y: f64, content: &str, size: f64, fill: &str) -> Shape {
@@ -192,19 +189,68 @@ struct Palette {
 
 fn palette_for(prompt: &str) -> Palette {
     if prompt.contains("红") {
-        Palette { name: "赤霞", bg: "#150d12", accent: "#ef4444", accent2: "#fb7185", accent3: "#f97316", title: "#fdf2f3" }
+        Palette {
+            name: "赤霞",
+            bg: "#150d12",
+            accent: "#ef4444",
+            accent2: "#fb7185",
+            accent3: "#f97316",
+            title: "#fdf2f3",
+        }
     } else if prompt.contains("橙") {
-        Palette { name: "落日", bg: "#160f0b", accent: "#f97316", accent2: "#fbbf24", accent3: "#fb7185", title: "#fdf6ee" }
+        Palette {
+            name: "落日",
+            bg: "#160f0b",
+            accent: "#f97316",
+            accent2: "#fbbf24",
+            accent3: "#fb7185",
+            title: "#fdf6ee",
+        }
     } else if prompt.contains("黄") {
-        Palette { name: "暖阳", bg: "#141208", accent: "#eab308", accent2: "#facc15", accent3: "#f97316", title: "#fdfbea" }
+        Palette {
+            name: "暖阳",
+            bg: "#141208",
+            accent: "#eab308",
+            accent2: "#facc15",
+            accent3: "#f97316",
+            title: "#fdfbea",
+        }
     } else if prompt.contains("绿") {
-        Palette { name: "青苔", bg: "#0b1410", accent: "#22c55e", accent2: "#4ade80", accent3: "#2dd4bf", title: "#f0fdf4" }
+        Palette {
+            name: "青苔",
+            bg: "#0b1410",
+            accent: "#22c55e",
+            accent2: "#4ade80",
+            accent3: "#2dd4bf",
+            title: "#f0fdf4",
+        }
     } else if prompt.contains("紫") || prompt.contains("粉") {
-        Palette { name: "霓虹", bg: "#120d1c", accent: "#a855f7", accent2: "#ec4899", accent3: "#818cf8", title: "#faf5ff" }
+        Palette {
+            name: "霓虹",
+            bg: "#120d1c",
+            accent: "#a855f7",
+            accent2: "#ec4899",
+            accent3: "#818cf8",
+            title: "#faf5ff",
+        }
     } else if prompt.contains("蓝") || prompt.contains("科技") {
-        Palette { name: "深海", bg: "#080f1e", accent: "#3b82f6", accent2: "#38bdf8", accent3: "#818cf8", title: "#eff6ff" }
+        Palette {
+            name: "深海",
+            bg: "#080f1e",
+            accent: "#3b82f6",
+            accent2: "#38bdf8",
+            accent3: "#818cf8",
+            title: "#eff6ff",
+        }
     } else {
-        Palette { name: "紫曜", bg: "#0e1017", accent: "#7c6cf0", accent2: "#5a8bff", accent3: "#38bdf8", title: "#f4f6fc" }
+        Palette {
+            name: "紫曜",
+            bg: "#0e1017",
+            accent: "#7c6cf0",
+            accent2: "#5a8bff",
+            accent3: "#38bdf8",
+            title: "#f4f6fc",
+        }
     }
 }
 
@@ -249,7 +295,13 @@ fn extract_duration(prompt: &str) -> f64 {
 
 fn extract_title(prompt: &str) -> String {
     // 优先取引号内文字
-    for (open, close) in [('「', '」'), ('『', '』'), ('“', '”'), ('"', '"'), ('\'', '\'')] {
+    for (open, close) in [
+        ('「', '」'),
+        ('『', '』'),
+        ('“', '”'),
+        ('"', '"'),
+        ('\'', '\''),
+    ] {
         if let Some(start) = prompt.find(open) {
             let after = start + open.len_utf8();
             if let Some(len) = prompt[after..].find(close) {
@@ -288,7 +340,10 @@ struct Lcg(u64);
 
 impl Lcg {
     fn next(&mut self) -> f64 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((self.0 >> 33) as f64) / ((1u64 << 31) as f64)
     }
 }
@@ -333,12 +388,23 @@ pub fn scene_from_prompt(prompt: &str) -> Scene {
             let y = 60.0 + rng.next() * 600.0;
             let r = 0.8 + rng.next() * 2.6;
             let delay = 0.2 + rng.next() * 2.4;
-            let color = if rng.next() > 0.5 { palette.accent2 } else { palette.accent3 };
+            let color = if rng.next() > 0.5 {
+                palette.accent2
+            } else {
+                palette.accent3
+            };
             layers.push(animated(
                 circle(x, y, r, color),
                 vec![
                     anim("opacity", 0.0, 0.75, delay, delay + 0.8, Easing::EaseOut),
-                    anim("y", y + 18.0, y, delay, duration.min(delay + 2.0), Easing::EaseOutCubic),
+                    anim(
+                        "y",
+                        y + 18.0,
+                        y,
+                        delay,
+                        duration.min(delay + 2.0),
+                        Easing::EaseOutCubic,
+                    ),
                 ],
             ));
         }
@@ -393,7 +459,11 @@ pub fn scene_from_prompt(prompt: &str) -> Scene {
     ));
 
     // 三个强调点
-    let dots = [(598.0, palette.accent), (640.0, palette.accent2), (682.0, palette.accent3)];
+    let dots = [
+        (598.0, palette.accent),
+        (640.0, palette.accent2),
+        (682.0, palette.accent3),
+    ];
     for (i, (x, color)) in dots.into_iter().enumerate() {
         let delay = 1.35 + i as f64 * 0.14;
         layers.push(animated(

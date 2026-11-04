@@ -117,7 +117,10 @@ pub fn read(app: &AppHandle, rel: &str) -> Result<String, String> {
     if meta.len() > MAX_READ_BYTES {
         let bytes = fs::read(&path).map_err(|e| format!("读取失败：{e}"))?;
         let clipped = String::from_utf8_lossy(&bytes[..MAX_READ_BYTES as usize]).to_string();
-        return Ok(format!("{clipped}\n\n…（文件过大，已截断到 {} KB）", MAX_READ_BYTES / 1024));
+        return Ok(format!(
+            "{clipped}\n\n…（文件过大，已截断到 {} KB）",
+            MAX_READ_BYTES / 1024
+        ));
     }
     fs::read_to_string(&path).map_err(|e| format!("读取失败：{rel}（{e}）"))
 }

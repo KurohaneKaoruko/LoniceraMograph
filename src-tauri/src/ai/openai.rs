@@ -28,7 +28,11 @@ fn build_messages(system: &str, history: &[ChatMessage], user_message: Option<&s
                 messages.push(m);
             }
             role => {
-                let role = if role == "assistant" { "assistant" } else { "user" };
+                let role = if role == "assistant" {
+                    "assistant"
+                } else {
+                    "user"
+                };
                 messages.push(json!({ "role": role, "content": msg.content }));
             }
         }
@@ -131,8 +135,11 @@ async fn do_stream(
                     slot["function"]["name"] = json!(name);
                 }
                 if let Some(args) = tc.pointer("/function/arguments").and_then(|v| v.as_str()) {
-                    slot["function"]["arguments"] =
-                        json!(format!("{}{}", slot["function"]["arguments"].as_str().unwrap_or(""), args));
+                    slot["function"]["arguments"] = json!(format!(
+                        "{}{}",
+                        slot["function"]["arguments"].as_str().unwrap_or(""),
+                        args
+                    ));
                 }
             }
         }
@@ -149,10 +156,13 @@ async fn do_stream(
         .filter(|tc| !tc["function"]["name"].as_str().unwrap_or("").is_empty())
         .map(|mut tc| {
             if tc["id"].as_str().unwrap_or("").is_empty() {
-                tc["id"] = json!(format!("call_{}", std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.subsec_nanos())
-                    .unwrap_or(0)));
+                tc["id"] = json!(format!(
+                    "call_{}",
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.subsec_nanos())
+                        .unwrap_or(0)
+                ));
             }
             tc
         })
@@ -177,9 +187,17 @@ pub async fn stream(
     history: &[ChatMessage],
     user_message: &str,
 ) -> Result<String, String> {
-    do_stream(client, sink, config, system, history, Some(user_message), None)
-        .await
-        .map(|t| t.text)
+    do_stream(
+        client,
+        sink,
+        config,
+        system,
+        history,
+        Some(user_message),
+        None,
+    )
+    .await
+    .map(|t| t.text)
 }
 
 /// agent 轮次：流式输出 + 工具调用收集。

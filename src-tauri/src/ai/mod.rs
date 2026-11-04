@@ -177,13 +177,37 @@ pub async fn run(
 
     let text = match provider {
         "openai" => {
-            openai::stream(&client, &sink, config, SYSTEM_PROMPT, &history, user_message).await?
+            openai::stream(
+                &client,
+                &sink,
+                config,
+                SYSTEM_PROMPT,
+                &history,
+                user_message,
+            )
+            .await?
         }
         "anthropic" => {
-            anthropic::stream(&client, &sink, config, SYSTEM_PROMPT, &history, user_message).await?
+            anthropic::stream(
+                &client,
+                &sink,
+                config,
+                SYSTEM_PROMPT,
+                &history,
+                user_message,
+            )
+            .await?
         }
         "ollama" => {
-            ollama::stream(&client, &sink, config, SYSTEM_PROMPT, &history, user_message).await?
+            ollama::stream(
+                &client,
+                &sink,
+                config,
+                SYSTEM_PROMPT,
+                &history,
+                user_message,
+            )
+            .await?
         }
         other => return Err(format!("未知的 AI Provider：{other}")),
     };
@@ -233,7 +257,10 @@ pub async fn run_agent(
         .build()
         .map_err(|e| format!("初始化 HTTP 客户端失败: {e}"))?;
 
-    let system = format!("{SYSTEM_PROMPT}{AGENT_PROMPT}\n{}", crate::agent_tools::SCRIPT_GUIDE);
+    let system = format!(
+        "{SYSTEM_PROMPT}{AGENT_PROMPT}\n{}",
+        crate::agent_tools::SCRIPT_GUIDE
+    );
     let tools = crate::agent_tools::definitions();
 
     // messages: 历史 + 本轮动态消息（assistant/tool 交替）

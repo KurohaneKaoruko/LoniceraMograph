@@ -147,7 +147,10 @@ fn find_engine() -> Option<Engine> {
                     // --permission: 禁文件系统/子进程；--no-warnings 保持输出干净
                     args: vec!["--permission", "--no-warnings"],
                 },
-                "qjs" => Engine { program: "qjs", args: vec![] },
+                "qjs" => Engine {
+                    program: "qjs",
+                    args: vec![],
+                },
                 "bun" => Engine {
                     program: "bun",
                     args: vec!["run", "-"],
@@ -200,7 +203,10 @@ fn wait_with_timeout(mut child: std::process::Child, timeout: Duration) -> Resul
 
     let start = std::time::Instant::now();
     let status = loop {
-        match child.try_wait().map_err(|e| format!("等待脚本退出失败：{e}"))? {
+        match child
+            .try_wait()
+            .map_err(|e| format!("等待脚本退出失败：{e}"))?
+        {
             Some(status) => break status,
             None => {
                 if start.elapsed() > timeout {
@@ -293,10 +299,7 @@ mod tests {
                     e.contains("boom") || e.contains("JS 引擎"),
                     "错误信息应含 stderr 内容: {e}"
                 );
-                assert!(
-                    !e.contains("没有调用 exportScene"),
-                    "不应误报缺少导出: {e}"
-                );
+                assert!(!e.contains("没有调用 exportScene"), "不应误报缺少导出: {e}");
             }
         }
     }
@@ -314,7 +317,11 @@ mod tests {
             Ok(scene) => {
                 assert_eq!(scene.name, "大输出");
                 match &scene.layers[0].shape {
-                    Shape::Circle { stroke, stroke_width, .. } => {
+                    Shape::Circle {
+                        stroke,
+                        stroke_width,
+                        ..
+                    } => {
                         assert_eq!(stroke.as_deref(), Some("#fff"));
                         assert_eq!(*stroke_width, Some(3.0));
                     }

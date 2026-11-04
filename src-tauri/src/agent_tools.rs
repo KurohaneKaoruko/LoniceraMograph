@@ -206,8 +206,8 @@ pub fn execute(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, String
                 return Err("load_scene: 缺少 path".into());
             }
             let content = workspace::read(app, &path)?;
-            let mut scene: Scene = serde_json::from_str(&content)
-                .map_err(|e| format!("场景 JSON 解析失败：{e}"))?;
+            let mut scene: Scene =
+                serde_json::from_str(&content).map_err(|e| format!("场景 JSON 解析失败：{e}"))?;
             if scene.layers.is_empty() {
                 return Err("场景没有任何图层".into());
             }
@@ -216,7 +216,9 @@ pub fn execute(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, String
             *ctx.current_scene.lock().unwrap() = Some(scene.clone());
             Ok(format!(
                 "已加载「{}」（{}s，{} 图层）到预览",
-                scene.name, scene.duration_sec, scene.layers.len()
+                scene.name,
+                scene.duration_sec,
+                scene.layers.len()
             ))
         }
 
@@ -226,8 +228,7 @@ pub fn execute(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, String
                 return Err("compile_script: 缺少 path".into());
             }
             let code = workspace::read(app, &path)?;
-            let scene = crate::script::run(&code)
-                .map_err(|e| format!("脚本执行失败：{e}"))?;
+            let scene = crate::script::run(&code).map_err(|e| format!("脚本执行失败：{e}"))?;
             let layer_count = scene.layers.len();
             crate::commands::push_scene(app, &scene)?;
             *ctx.current_scene.lock().unwrap() = Some(scene.clone());
@@ -238,8 +239,9 @@ pub fn execute(ctx: &ToolCtx, name: &str, args: &Value) -> Result<String, String
         }
 
         "get_scene" => match ctx.current_scene.lock().unwrap().clone() {
-            Some(scene) => serde_json::to_string_pretty(&scene)
-                .map_err(|e| format!("序列化失败：{e}")),
+            Some(scene) => {
+                serde_json::to_string_pretty(&scene).map_err(|e| format!("序列化失败：{e}"))
+            }
             None => Ok("（当前没有已加载的场景，请先 load_scene 或 compile_script）".into()),
         },
 
@@ -325,7 +327,11 @@ fn check_scene_errors(scene: &Scene) -> String {
     if problems.is_empty() {
         "场景检查通过，未发现问题。".into()
     } else {
-        format!("发现 {} 个问题：\n- {}", problems.len(), problems.join("\n- "))
+        format!(
+            "发现 {} 个问题：\n- {}",
+            problems.len(),
+            problems.join("\n- ")
+        )
     }
 }
 
