@@ -108,15 +108,20 @@ pub fn run(code: &str) -> Result<Scene, String> {
 
     let _ = stdin_thread.join();
 
-    if !out.stderr.trim().is_empty() {
-        return Err(truncate_err(&out.stderr));
-    }
-
     let line = out
         .stdout
         .lines()
         .find(|l| l.trim_start().starts_with(SENTINEL))
-        .ok_or_else(|| "脚本没有调用 exportScene()，未产生场景。".to_string())?;
+        .ok_or_else(|| {
+            // stdout 没有场景：优先报 stderr 里的真实错误（异常堆栈等），
+            // 其次按退出情况给出可行动的提示。console.error 调试输出不再
+            // 抢占成功结果——只要导出了场景就照常解析。
+            let stderr = out.stderr.trim();
+            if !stderr.is_empty() {
+                return truncate_err(stderr);
+            }
+            "脚本没有调用 exportScene()，未产生场景。".to_string()
+        })?;
 
     let json = line.trim_start()[SENTINEL.len()..].trim();
     let mut scene: Scene = serde_json::from_str(json)
@@ -256,6 +261,43 @@ mod tests {
         match run(code) {
             Ok(_) => panic!("应当失败"),
             Err(e) => assert!(!e.is_empty()),
+        }
+    }
+
+    #[test]
+    fn stderr_noise_does_not_override_successful_export() {
+        // AI 写脚本时常用 console.error/console.warn 调试；只要场景导出成功，
+        // stderr 里的噪声不应把执行误判为失败（曾因「stderr 非空即失败」
+        // 把含调试输出的成功脚本整个丢弃）。
+        let code = r##"
+            console.warn("警告：这只是调试输出");
+            console.error("错误：这也只是调试输出");
+            const s = scene("带噪声", 2);
+            addLayer(text("你好", 10, 10, {}), []);
+            exportScene(s);
+        "##;
+        match run(code) {
+            Ok(scene) => assert_eq!(scene.name, "带噪声"),
+            Err(e) => assert!(e.contains("JS 引擎"), "非引擎错误: {e}"),
+        }
+    }
+
+    #[test]
+    fn runtime_error_reports_stderr_not_missing_sentinel() {
+        // 失败时应上报 stderr 的真实异常，而不是笼统的「没有调用 exportScene」
+        let code = "console.error('boom: 坐标计算失败'); null.crash();";
+        match run(code) {
+            Ok(_) => panic!("应当失败"),
+            Err(e) => {
+                assert!(
+                    e.contains("boom") || e.contains("JS 引擎"),
+                    "错误信息应含 stderr 内容: {e}"
+                );
+                assert!(
+                    !e.contains("没有调用 exportScene"),
+                    "不应误报缺少导出: {e}"
+                );
+            }
         }
     }
 
