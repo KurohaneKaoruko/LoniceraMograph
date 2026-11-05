@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { PreviewRenderer } from "./renderer";
 import { sanitizeSceneMeta } from "./sceneValidate";
 import { sanitizeCmds } from "./drawSanitize";
+import { renderErrorMessage, shouldFallback } from "./renderGuard";
+import { toolActivityClass, toolActivityText } from "./toolActivity";
 import type { AiConfig, ChatMessage, DrawCmd, FileEntry, SceneMeta, StreamEvent } from "./types";
 
 /// ---------------------------------------------------------------------------
@@ -58,7 +60,12 @@ const state: AppState = {
 /// ---------------------------------------------------------------------------
 /// 预览循环：requestAnimationFrame 驱动播放，帧内容由 Rust 求值
 /// ---------------------------------------------------------------------------
+/// 渲染失败护栏：单帧绘制抛异常不能让 rAF 循环整体死亡（画面定格且无提示）。
+/// 连续失败达到阈值且有上一可用场景时回退；任一帧成功即清零计数。
 let lastTs = 0;
+let drawFailStreak = 0;
+let lastGood: { scene: SceneMeta; frame: DrawCmd[] } | null = null;
+
 function tick(ts: number) {
   const dt = lastTs ? (ts - lastTs) / 1000 : 0;
   lastTs = ts;
@@ -81,12 +88,49 @@ async function refreshFrame() {
     state.frame = sanitizeCmds(await invoke<DrawCmd[]>("get_frame", { time: state.time }));
   } catch (e) {
     console.error("get_frame failed", e);
+    showRenderError(`获取帧数据失败：${renderErrorMessage(e)}`);
   }
+}
+
+/**
+ * 渲染失败呈现：把错误亮在画布遮罩上；连续失败达到阈值且存在
+ * 上一可用场景时回退到它（自动暂停并提示），避免用户面对定格/黑屏。
+ * 成功绘制后由 paint() 清除提示并复位计数。
+ */
+function showRenderError(message: string) {
+  drawFailStreak += 1;
+  const good = lastGood;
+  if (good && shouldFallback(drawFailStreak, true)) {
+    const from = state.scene?.name ?? "未知场景";
+    state.scene = good.scene;
+    state.frame = sanitizeCmds(good.frame);
+    state.time = 0;
+    setPlaying(false);
+    drawFailStreak = 0;
+    overlay.className = "fallback-note";
+    overlay.textContent = `⚠ 场景「${from}」渲染失败，已回退到上一可用场景「${good.scene.name}」`;
+  } else if (overlay.className !== "fallback-note") {
+    overlay.className = "error-note";
+    overlay.textContent = `⚠ ${message}`;
+  }
+  addMessage("error", `渲染失败：${message}`);
 }
 
 function paint() {
   if (!state.scene) return;
-  renderer.draw(state.frame, state.scene.width, state.scene.height);
+  try {
+    renderer.draw(state.frame, state.scene.width, state.scene.height);
+  } catch (e) {
+    console.error("draw failed", e);
+    showRenderError(renderErrorMessage(e));
+    return;
+  }
+  drawFailStreak = 0;
+  if (overlay.className === "error-note" || overlay.className === "fallback-note") {
+    overlay.className = "";
+    overlay.textContent = `scene: ${state.scene.name}`;
+  }
+  lastGood = { scene: state.scene, frame: state.frame };
   const pct =
     state.scene.durationSec > 0 ? Math.min(100, (state.time / state.scene.durationSec) * 100) : 0;
   (timelineEl.firstElementChild as HTMLElement).style.width = `${pct}%`;
@@ -129,15 +173,15 @@ async function ensureListening() {
 }
 
 /** 工具活动行：附到当前 AI 气泡（或新建一条），展示 agent 正在做什么。 */
-function appendToolActivity(detail: string) {
+function appendToolActivity(detail: string, ok = true) {
   const last = messagesEl.lastElementChild as HTMLElement | null;
   const host =
     last && last.classList.contains("ai") && !last.dataset.done
       ? last
       : addMessage("assistant", "");
   const line = document.createElement("span");
-  line.className = "tool-activity";
-  line.textContent = detail;
+  line.className = toolActivityClass(ok);
+  line.textContent = toolActivityText(detail, ok);
   host.appendChild(line);
   host.classList.remove("pending");
   ensureTextSpan(host);
@@ -172,7 +216,7 @@ function handleStreamEvent(e: StreamEvent) {
       break;
     }
     case "tool": {
-      appendToolActivity(e.detail);
+      appendToolActivity(e.detail, e.ok);
       break;
     }
     case "filesChanged": {

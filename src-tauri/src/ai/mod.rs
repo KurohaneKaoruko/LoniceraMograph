@@ -329,6 +329,7 @@ pub async fn run_agent(
                         crate::events::StreamEvent::Tool {
                             name: name.clone(),
                             detail: tool_detail(&name, &serde_json::json!({})),
+                            ok: false,
                         },
                     );
                     messages.push(ChatMessage {
@@ -342,19 +343,24 @@ pub async fn run_agent(
                 }
             };
 
-            // 前端展示工具活动
+            // 工具成败 = 该步是否得到 Err。失败行的错误详情一并亮给用户：
+            // 前端只拿到 ok 标记，无法自行区分「模型写错路径」与「沙箱崩溃」。
+            let (result, tool_ok) = match crate::agent_tools::execute(&ctx, &name, &args) {
+                Ok(text) => (text, true),
+                Err(e) => (format!("错误：{e}"), false),
+            };
             let _ = app.emit(
                 "stream",
                 crate::events::StreamEvent::Tool {
                     name: name.clone(),
-                    detail: tool_detail(&name, &args),
+                    detail: if tool_ok {
+                        tool_detail(&name, &args)
+                    } else {
+                        format!("{} 失败：{result}", tool_detail(&name, &args))
+                    },
+                    ok: tool_ok,
                 },
             );
-
-            let result = match crate::agent_tools::execute(&ctx, &name, &args) {
-                Ok(text) => text,
-                Err(e) => format!("错误：{e}"),
-            };
             // 工具成功即视作场景已加载（错误统一带「错误：」前缀，不再靠
             // 结果文本是否以「错误」开头反推——场景名恰好以这两个字开头时
             // 曾被误判）。成功标记只认工具名，避免脆弱的字符串约定。

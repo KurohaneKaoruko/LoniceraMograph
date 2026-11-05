@@ -9,8 +9,13 @@ use crate::scene::{DrawCmd, SceneMeta};
 pub enum StreamEvent {
     /// 流式文本增量（AI 回复）。
     Delta { text: String },
-    /// Agent 正在调用工具。
-    Tool { name: String, detail: String },
+    /// Agent 正在调用工具（ok=false 表示该步执行失败，错误已回传模型）。
+    Tool {
+        name: String,
+        detail: String,
+        #[serde(default)]
+        ok: bool,
+    },
     /// 工作区文件发生变化（供前端刷新文件树）。
     FilesChanged,
     /// 场景已更新，附带 0 时刻的帧，便于前端立即显示。

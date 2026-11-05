@@ -37,7 +37,7 @@ export interface FileEntry {
 
 export type StreamEvent =
   | { type: "delta"; text: string }
-  | { type: "tool"; name: string; detail: string }
+  | { type: "tool"; name: string; detail: string; ok?: boolean }
   | { type: "filesChanged" }
   | { type: "scene"; scene: SceneMeta; frame: DrawCmd[]; time: number }
   | { type: "done" }

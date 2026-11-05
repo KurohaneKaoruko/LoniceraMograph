@@ -91,6 +91,14 @@
         border: 1px solid var(--border);
         pointer-events: none;
       }
+      #overlay.error-note, #overlay.fallback-note {
+        color: #ff9aa8;
+        border-color: #5c2a36;
+        max-width: calc(100% - 52px);
+        pointer-events: auto;
+        white-space: pre-wrap;
+      }
+      #overlay.fallback-note { border-color: #8a6d2a; color: #f5d08a; }
       #files-panel {
         position: absolute;
         top: 26px;
@@ -232,6 +240,11 @@
         border-radius: 4px;
         color: var(--text-dim);
         font-size: 0.82rem;
+      }
+      .msg .tool-activity.failed {
+        border-left-color: #e0566f;
+        background: rgba(224,86,111,0.12);
+        color: #ff9aa8;
       }
 
       #composer {
