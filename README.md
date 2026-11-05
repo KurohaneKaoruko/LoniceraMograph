@@ -13,6 +13,7 @@ AI Agent 驱动的 MG（Motion Graphics）动画创作工具。**视频实时预
   - `get_scene_errors` 场景体检（越界、空图层、不支持属性、描边过粗…），`get_scene` 读取当前场景
   - 多步循环（上限 12 步）：写文件 → 加载预览 → 自查 → 修复，工具活动实时展示在聊天中（失败标红并附原因）；`get_scene` / `get_scene_errors` 跨步骤可见（写 → 查 → 改的完整闭环）
 - 📁 **工作区**：`~/文档/LoniceraMograph/`（无文档目录时回退应用数据目录），`scenes/*.json` + `scripts/*.js`；预览区右上角文件面板可点击打开
+- ✦ **内置模板库**：8 个 MG 模板覆盖标题入场、数据进度条、Logo 描边展示、淡入淡出/滑入滑出转场、漂浮/呼吸循环背景、数字倒计时；「✦ 模板」面板按分类浏览、一键插入当前工程，也可作为让 AI 改造的起点
 - ⚙️ **JS 脚本生成动画**：脚本跑在沙箱中（Node `--permission` / 其他引擎），提供 `scene()` / `text()` / `anim()` 等辅助函数，适合程序化粒子、波浪、随机布局；脚本输出量不受管道缓冲区限制（读取走独立线程，不会误报超时）
 - 🎨 **图元属性**：6 种图形（rect / circle / ellipse / line / text / path），填充 + 描边（`stroke` / `strokeWidth`）、旋转（`rotation`，path 以包围盒中心、text 以锚点为原点）、透明度均可补间
 - 💬 **多 Provider**：Mock（离线演示）/ OpenAI 兼容 / Anthropic / Ollama，流式输出
@@ -51,6 +52,7 @@ npm run build        # 前端类型检查 + Vite 构建产物（Tauri 打包时�
 | 模块（`src-tauri/src/`） | 职责 |
 |------|------|
 | `scene.rs`       | 场景模型、补间求值、缓动函数 |
+| `templates.rs`   | 内置 MG 模板库（编译期打包 JSON，list/load） |
 | `agent_tools.rs` | Agent 工具定义与执行器、场景体检 |
 | `script.rs`      | JS 脚本沙箱（node --permission / qjs / bun / deno） |
 | `workspace.rs`   | 工作区文件操作（路径安全防护） |
@@ -60,13 +62,14 @@ npm run build        # 前端类型检查 + Vite 构建产物（Tauri 打包时�
 
 | 模块（`src/`） | 职责 |
 |------|------|
-| `main.ts`           | 界面装配：预览循环、聊天流、导出、文件面板、AI 设置 |
+| `main.ts`           | 界面装配：预览循环、聊天流、导出、文件面板、模板面板、AI 设置 |
 | `renderer.ts`       | Canvas 光栅化：消费 Rust 下发的 DrawCmd |
 | `types.ts`          | 与 Rust 结构对应的事件/数据类型 |
 | `sceneValidate.ts`  | 场景元信息护栏（纯函数，含单元测试） |
 | `drawSanitize.ts`   | 绘制指令护栏：光栅化前把异常数值收敛到安全范围（含单元测试） |
 | `renderGuard.ts`    | 渲染失败决策：连续失败回退上一可用场景（含单元测试） |
 | `toolActivity.ts`   | 工具活动行展示：失败红标与 ✗ 前缀（含单元测试） |
+| `templates.ts`      | 模板面板展示决策：分类分组、列表文案（含单元测试） |
 
 测试：`cd src-tauri && cargo test`（场景求值、JSON 提取、脚本沙箱、路径安全、场景体检…）；前端 `npm test`。
 

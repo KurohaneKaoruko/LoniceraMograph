@@ -6,6 +6,7 @@ import { sanitizeSceneMeta } from "./sceneValidate";
 import { sanitizeCmds } from "./drawSanitize";
 import { renderErrorMessage, shouldFallback } from "./renderGuard";
 import { toolActivityClass, toolActivityText } from "./toolActivity";
+import { categoryIcon, groupByCategory, panelHeading, templateSummary, templateTitle, type TemplateMeta } from "./templates";
 import type { AiConfig, ChatMessage, DrawCmd, FileEntry, SceneMeta, StreamEvent } from "./types";
 
 /// ---------------------------------------------------------------------------
@@ -486,6 +487,78 @@ async function openWorkspaceFile(path: string) {
 }
 
 refreshFilesBtn.addEventListener("click", () => void refreshFiles());
+
+/// ---------------------------------------------------------------------------
+/// 模板面板：内置 MG 模板浏览 + 一键插入当前工程
+/// ---------------------------------------------------------------------------
+const tplPanelEl = $("templates-panel");
+const tplListEl = $("templates-list");
+const tplHeadingEl = $("templates-heading");
+const tplToggleBtn = $<HTMLButtonElement>("btn-templates");
+
+let templatesLoaded = false;
+
+/** 拉取模板元数据并渲染分组列表；失败时面板里亮一行错误。 */
+async function loadTemplates() {
+  if (templatesLoaded) return;
+  try {
+    const metas = await invoke<TemplateMeta[]>("list_templates");
+    tplHeadingEl.textContent = panelHeading(metas);
+    tplListEl.textContent = "";
+    if (metas.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "（无内置模板）";
+      tplListEl.appendChild(empty);
+    }
+    for (const group of groupByCategory(metas)) {
+      const head = document.createElement("div");
+      head.className = "tpl-cat";
+      head.textContent = `${categoryIcon(group.category)} ${group.label}`;
+      tplListEl.appendChild(head);
+      for (const tpl of group.items) {
+        const row = document.createElement("div");
+        row.className = "tpl";
+        row.title = tpl.description;
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = templateTitle(tpl);
+        const sum = document.createElement("span");
+        sum.className = "sum";
+        sum.textContent = templateSummary(tpl);
+        row.append(name, sum);
+        row.addEventListener("click", () => void insertTemplate(tpl));
+        tplListEl.appendChild(row);
+      }
+    }
+    templatesLoaded = true;
+  } catch (e) {
+    console.error("list_templates failed", e);
+    tplListEl.textContent = "";
+    const err = document.createElement("div");
+    err.className = "empty";
+    err.textContent = `模板列表加载失败：${e}`;
+    tplListEl.appendChild(err);
+  }
+}
+
+/** 一键插入：加载模板到预览播放，不覆盖工作区任何文件。 */
+async function insertTemplate(tpl: TemplateMeta) {
+  try {
+    const name = await invoke<string>("load_template", { id: tpl.id });
+    overlay.textContent = `scene: ${name}（模板）`;
+  } catch (e) {
+    addMessage("error", `加载模板「${tpl.name}」失败: ${e}`);
+  }
+}
+
+tplToggleBtn.addEventListener("click", () => {
+  const open = tplPanelEl.classList.toggle("hidden") === false;
+  if (open) void loadTemplates();
+});
+
+const tplCloseBtn = $<HTMLButtonElement>("btn-close-templates");
+tplCloseBtn.addEventListener("click", () => tplPanelEl.classList.add("hidden"));
 
 /// ---------------------------------------------------------------------------
 /// AI 配置（localStorage 持久化）

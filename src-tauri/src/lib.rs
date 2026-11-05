@@ -5,6 +5,7 @@ mod demo;
 mod events;
 mod scene;
 mod script;
+mod templates;
 mod workspace;
 
 use commands::AppState;
@@ -27,6 +28,8 @@ pub fn run() {
             commands::open_scene,
             commands::run_script,
             commands::workspace_root,
+            commands::list_templates,
+            commands::load_template,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

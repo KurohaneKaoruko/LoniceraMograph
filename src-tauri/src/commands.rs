@@ -226,3 +226,22 @@ pub fn save_export(
     std::fs::write(&path, bytes).map_err(|e| format!("写入视频文件失败：{e}"))?;
     Ok(path.to_string_lossy().to_string())
 }
+
+/// 列出内置模板元数据（前端模板面板用）。
+#[tauri::command]
+pub fn list_templates() -> Vec<crate::templates::TemplateMeta> {
+    crate::templates::list()
+}
+
+/// 加载内置模板到预览（一键插入当前工程）；返回场景名。
+#[tauri::command]
+pub fn load_template(app: AppHandle, id: String) -> Result<String, String> {
+    let mut scene = crate::templates::load(&id)?;
+    if scene.layers.is_empty() {
+        return Err(format!("模板 {id} 没有任何图层"));
+    }
+    scene.normalize();
+    let name = scene.name.clone();
+    push_scene(&app, &scene)?;
+    Ok(name)
+}
