@@ -6,9 +6,14 @@
   "background": "#0e1017",
   "layers": [
     {
-      "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1280, "h": 720, "fill": "#7c6cf0", "opacity": 1 },
+      "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1280, "h": 720, "fill": "#7c6cf0" },
       "animations": [
-        { "prop": "opacity", "from": 0, "to": 1, "start": 0.0, "end": 0.9, "easing": "easeInOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.0, "end": 0.9, "easing": "easeInOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1280, "h": 720, "fill": "#7c6cf0" },
+      "animations": [
         { "prop": "opacity", "from": 1, "to": 0, "start": 3.2, "end": 4.1, "easing": "easeInOutCubic" }
       ]
     },
@@ -16,18 +21,31 @@
       "shape": { "kind": "text", "x": 640, "y": 340, "text": "CHAPTER 03", "size": 44, "fill": "#ffffff", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 0.6, "end": 1.4, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 3.0, "end": 3.8, "easing": "easeInCubic" }
+        { "prop": "y", "from": 356, "to": 340, "start": 0.6, "end": 1.5, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 340, "text": "CHAPTER 03", "size": 44, "fill": "#ffffff", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 1, "to": 0, "start": 3.0, "end": 3.8, "easing": "easeInCubic" },
+        { "prop": "y", "from": 340, "to": 328, "start": 3.0, "end": 3.8, "easing": "easeInCubic" }
       ]
     },
     {
       "shape": { "kind": "rect", "x": 560, "y": 400, "w": 160, "h": 3, "fill": "#ffffff", "radius": 1.5 },
       "animations": [
         { "prop": "w", "from": 0, "to": 160, "start": 0.8, "end": 1.7, "easing": "easeOutCubic" },
+        { "prop": "x", "from": 640, "to": 560, "start": 0.8, "end": 1.7, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "rect", "x": 560, "y": 400, "w": 160, "h": 3, "fill": "#ffffff", "radius": 1.5, "opacity": 1 },
+      "animations": [
         { "prop": "opacity", "from": 1, "to": 0, "start": 3.0, "end": 3.8, "easing": "easeInCubic" }
       ]
     },
     {
-      "shape": { "kind": "text", "x": 640, "y": 360, "text": "整屏色幕淡入淡出，适合章节间过渡", "size": 20, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
+      "shape": { "kind": "text", "x": 640, "y": 360, "text": "整屏色幕淡入淡出，适合章节间过渡（出入场分两层接力）", "size": 20, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 4.2, "end": 4.9, "easing": "easeOutCubic" }
       ]

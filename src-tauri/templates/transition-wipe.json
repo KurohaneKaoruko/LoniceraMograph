@@ -8,7 +8,12 @@
     {
       "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1280, "h": 720, "fill": "#5a8bff" },
       "animations": [
-        { "prop": "x", "from": -1280, "to": 0, "start": 0.0, "end": 0.8, "easing": "easeInOutCubic" },
+        { "prop": "x", "from": -1280, "to": 0, "start": 0.0, "end": 0.8, "easing": "easeInOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "rect", "x": 0, "y": 0, "w": 1280, "h": 720, "fill": "#5a8bff" },
+      "animations": [
         { "prop": "x", "from": 0, "to": 1280, "start": 3.4, "end": 4.2, "easing": "easeInCubic" }
       ]
     },
@@ -16,18 +21,25 @@
       "shape": { "kind": "text", "x": 640, "y": 340, "text": "SCENE 02", "size": 40, "fill": "#14161c", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 1.1, "end": 1.7, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 2.7, "end": 3.3, "easing": "easeInCubic" }
+        { "prop": "y", "from": 356, "to": 340, "start": 1.1, "end": 1.8, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 340, "text": "SCENE 02", "size": 40, "fill": "#14161c", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 1, "to": 0, "start": 2.7, "end": 3.3, "easing": "easeInCubic" },
+        { "prop": "x", "from": 640, "to": 700, "start": 2.7, "end": 3.3, "easing": "easeInCubic" }
       ]
     },
     {
       "shape": { "kind": "rect", "x": 520, "y": 392, "w": 240, "h": 4, "fill": "#14161c", "radius": 2 },
       "animations": [
         { "prop": "w", "from": 0, "to": 240, "start": 1.2, "end": 2.0, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 2.7, "end": 3.3, "easing": "easeInCubic" }
+        { "prop": "x", "from": 640, "to": 520, "start": 1.2, "end": 2.0, "easing": "easeOutCubic" }
       ]
     },
     {
-      "shape": { "kind": "text", "x": 640, "y": 360, "text": "色块从左滑入承载章节标题，再向右滑出交还画面", "size": 20, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
+      "shape": { "kind": "text", "x": 640, "y": 360, "text": "色块滑入承载章节标题、再滑出交还画面（出入场分两层接力）", "size": 20, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 4.3, "end": 4.9, "easing": "easeOutCubic" }
       ]

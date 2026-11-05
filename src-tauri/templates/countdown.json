@@ -12,45 +12,48 @@
       ]
     },
     {
-      "shape": { "kind": "text", "x": 640, "y": 366, "text": "5", "size": 150, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
+      "shape": { "kind": "text", "x": 640, "y": 366, "text": "5", "size": 100, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
       "animations": [
-        { "prop": "opacity", "from": 0, "to": 1, "start": 0.0, "end": 0.5, "easing": "easeOutCubic" },
-        { "prop": "size", "from": 150, "to": 60, "start": 1.0, "end": 1.9, "easing": "easeInCubic" }
+        { "prop": "size", "from": 150, "to": 60, "start": 0.0, "end": 0.9, "easing": "easeOutCubic" }
       ]
     },
     {
       "shape": { "kind": "text", "x": 640, "y": 366, "text": "4", "size": 60, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
       "animations": [
-        { "prop": "size", "from": 150, "to": 60, "start": 1.9, "end": 2.8, "easing": "easeInCubic" },
-        { "prop": "opacity", "from": 0, "to": 1, "start": 1.9, "end": 2.15, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 2.8, "end": 2.95, "easing": "linear" }
+        { "prop": "size", "from": 150, "to": 60, "start": 0.9, "end": 1.8, "easing": "easeOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.9, "end": 0.95, "easing": "linear" }
       ]
     },
     {
       "shape": { "kind": "text", "x": 640, "y": 366, "text": "3", "size": 60, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
       "animations": [
-        { "prop": "size", "from": 150, "to": 60, "start": 2.8, "end": 3.7, "easing": "easeInCubic" },
-        { "prop": "opacity", "from": 0, "to": 1, "start": 2.8, "end": 3.05, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 3.7, "end": 3.85, "easing": "linear" }
+        { "prop": "size", "from": 150, "to": 60, "start": 1.8, "end": 2.7, "easing": "easeOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 1.8, "end": 1.85, "easing": "linear" }
       ]
     },
     {
       "shape": { "kind": "text", "x": 640, "y": 366, "text": "2", "size": 60, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
       "animations": [
-        { "prop": "size", "from": 150, "to": 60, "start": 3.7, "end": 4.6, "easing": "easeInCubic" },
-        { "prop": "opacity", "from": 0, "to": 1, "start": 3.7, "end": 3.95, "easing": "easeOutCubic" },
-        { "prop": "opacity", "from": 1, "to": 0, "start": 4.6, "end": 4.75, "easing": "linear" }
+        { "prop": "size", "from": 150, "to": 60, "start": 2.7, "end": 3.6, "easing": "easeOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 2.7, "end": 2.75, "easing": "linear" }
       ]
     },
     {
       "shape": { "kind": "text", "x": 640, "y": 366, "text": "1", "size": 60, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
       "animations": [
-        { "prop": "size", "from": 150, "to": 60, "start": 4.6, "end": 5.0, "easing": "easeInCubic" },
-        { "prop": "opacity", "from": 0, "to": 1, "start": 4.6, "end": 4.85, "easing": "easeOutCubic" }
+        { "prop": "size", "from": 150, "to": 60, "start": 3.6, "end": 4.5, "easing": "easeOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 3.6, "end": 3.65, "easing": "linear" }
       ]
     },
     {
-      "shape": { "kind": "text", "x": 640, "y": 620, "text": "每秒一个数字：缩小淡出接力，替换文案即得 GO! 收尾", "size": 20, "fill": "#6b7288", "align": "center", "baseline": "middle" },
+      "shape": { "kind": "text", "x": 640, "y": 366, "text": "GO", "size": 60, "fill": "#5a8bff", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "size", "from": 150, "to": 90, "start": 4.5, "end": 5.0, "easing": "easeOutCubic" },
+        { "prop": "opacity", "from": 0, "to": 1, "start": 4.5, "end": 4.55, "easing": "linear" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 620, "text": "每秒一个数字接力：新数字从 150 缩到 60，结尾接 GO 收束", "size": 20, "fill": "#6b7288", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 4.2, "end": 4.9, "easing": "easeOutCubic" }
       ]

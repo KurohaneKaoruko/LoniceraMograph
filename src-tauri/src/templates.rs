@@ -6,7 +6,8 @@
 //! 用户再保存或让 AI 改造均可。
 //!
 //! 模板遵守两条写作约定（`tests::templates_are_valid` 强制校验）：
-//! 1. 每个图层每个属性只挂一条补间（引擎按序求值，同 prop 多条会互相覆盖）；
+//! 1. 每个图层每个属性只挂一条补间：引擎中每条补间在 `t >= end` 后会把属性
+//!    永远钳在 `to`，同 prop 多条会互相覆盖——需要"往返"效果时克隆图层接力；
 //! 2. 数值都落在 normalize/check 的合法值域内（时长 0.5-300s、缓动为九种之一）。
 
 use serde::Serialize;
@@ -32,7 +33,8 @@ pub enum TemplateCategory {
 }
 
 impl TemplateCategory {
-    /// 分类的中文展示名（面板分组标题）。
+    /// 分类的中文展示名（面板分组标题；前端 templates.ts 有同一映射）。
+    #[allow(dead_code)] // 序列化后随 TemplateMeta 下发，Rust 侧自身不读取
     pub fn label(&self) -> &'static str {
         match self {
             TemplateCategory::Title => "标题入场",
@@ -60,102 +62,120 @@ pub struct TemplateMeta {
     pub layer_count: usize,
 }
 
-/// 内置模板清单：新增模板 = 放一份 JSON + 在此登记一行。
-macro_rules! templates {
-    $( ($id:literal, $file:literal, $name:literal, $cat:expr, $desc:literal) ),* $(,)? => {
-        const TEMPLATE_SOURCES: &[(&str, &str)] = &[ $( ($id, include_str!(concat!("templates/", $file))) ),* ];
+/// 单条模板登记：ID、分类、描述。JSON 文件由 SOURCES 表的
+/// include_str! 路径登记（两表按位置一一对应，测试强制校验）。
+struct TemplateEntry {
+    id: &'static str,
+    category: TemplateCategory,
+    description: &'static str,
+}
 
-        /// 全部模板元数据（按登记顺序，即面板展示顺序）。
-        pub fn list() -> Vec<TemplateMeta> {
-            let entries: &[(&str, TemplateCategory)] = &[ $( ($id, TemplateCategory::$cat) ),* ];
-            let _ = $name; // 名称以文件内容为准，登记表仅保证 JSON 与文件一一对应
-            TEMPLATE_SOURCES
-                .iter()
-                .zip(entries.iter())
-                .filter_map(|((id, src), (_, cat))| {
-                    let scene: Scene = serde_json::from_str(src).ok()?;
-                    Some(TemplateMeta {
-                        id: (*id).to_string(),
-                        name: scene.name.clone(),
-                        category: *cat,
-                        description: $desc.to_string(),
-                        duration_sec: scene.duration_sec,
-                        layer_count: scene.layers.len(),
-                    })
-                })
-                .collect()
-        }
-
-        /// 按 ID 取模板场景（解析失败视为内置资源损坏，返回 Err）。
-        pub fn load(id: &str) -> Result<Scene, String> {
-            let src = TEMPLATE_SOURCES
-                .iter()
-                .find(|(tid, _)| *tid == id)
-                .map(|(_, src)| *src)
-                .ok_or_else(|| format!("未知模板：{id}"))?;
-            serde_json::from_str(src).map_err(|e| format!("模板 {id} JSON 解析失败：{e}"))
+macro_rules! entry {
+    ($id:literal, $cat:ident, $desc:literal) => {
+        TemplateEntry {
+            id: $id,
+            category: TemplateCategory::$cat,
+            description: $desc,
         }
     };
 }
 
-templates![
-    (
+/// 内置模板登记表：新增模板 = 放一份 JSON + 在此加一行（顺序即面板展示顺序）。
+static ENTRIES: &[TemplateEntry] = &[
+    entry!(
         "title-fade",
-        "title-fade.json",
-        "标题入场",
         Title,
         "主标题上浮淡入，副标题跟进，装饰线左右展开；适合片头与章节题"
     ),
-    (
+    entry!(
         "progress-bar",
-        "progress-bar.json",
-        "数据进度条",
         Data,
         "两组数据条依次生长并亮出百分比，改文案换数值即可复用"
     ),
-    (
+    entry!(
         "logo-stroke",
-        "logo-stroke.json",
-        "Logo 描边展示",
         Logo,
         "图形先描边勾勒再填充浮现，品牌名随后入场；换 path 即换成你的 Logo"
     ),
-    (
+    entry!(
         "transition-fade",
-        "transition-fade.json",
-        "转场·淡入淡出",
         Transition,
         "整屏色幕淡入承载章节题再淡出，节奏柔和，适合章节间过渡"
     ),
-    (
+    entry!(
         "transition-wipe",
-        "transition-wipe.json",
-        "转场·滑入滑出",
         Transition,
         "色块从左滑入、停留展示、向右滑出，动感更强"
     ),
-    (
+    entry!(
         "bg-float",
-        "bg-float.json",
-        "循环背景·漂浮气泡",
         Background,
         "五个圆错相漂浮，首尾闭合无接缝循环；垫在标题/数据动画底下"
     ),
-    (
+    entry!(
         "bg-breathe",
-        "bg-breathe.json",
-        "循环背景·呼吸光晕",
         Background,
         "中心光晕缓慢呼吸，无接缝循环，任何前景都适用"
     ),
-    (
+    entry!(
         "countdown",
-        "countdown.json",
-        "数字倒计时",
         Countdown,
         "圆环弹出后 5→1 数字接力：每个数字放大缩小淡出，收尾可接 GO 画面"
     ),
 ];
+
+/// (id, 原始 JSON) 表：include_str! 编译期嵌入，零运行时 IO。
+static SOURCES: &[(&str, &str)] = &[
+    ("title-fade", include_str!("../templates/title-fade.json")),
+    (
+        "progress-bar",
+        include_str!("../templates/progress-bar.json"),
+    ),
+    ("logo-stroke", include_str!("../templates/logo-stroke.json")),
+    (
+        "transition-fade",
+        include_str!("../templates/transition-fade.json"),
+    ),
+    (
+        "transition-wipe",
+        include_str!("../templates/transition-wipe.json"),
+    ),
+    ("bg-float", include_str!("../templates/bg-float.json")),
+    ("bg-breathe", include_str!("../templates/bg-breathe.json")),
+    ("countdown", include_str!("../templates/countdown.json")),
+];
+
+fn source_of(id: &str) -> Option<&'static str> {
+    SOURCES
+        .iter()
+        .find(|(tid, _)| *tid == id)
+        .map(|(_, src)| *src)
+}
+
+/// 全部模板元数据（按登记顺序，即面板展示顺序）。
+/// 名称/时长/图层数从场景 JSON 解析得出，保证与实际内容一致。
+pub fn list() -> Vec<TemplateMeta> {
+    ENTRIES
+        .iter()
+        .filter_map(|e| {
+            let scene: Scene = serde_json::from_str(source_of(e.id)?).ok()?;
+            Some(TemplateMeta {
+                id: e.id.to_string(),
+                name: scene.name,
+                category: e.category,
+                description: e.description.to_string(),
+                duration_sec: scene.duration_sec,
+                layer_count: scene.layers.len(),
+            })
+        })
+        .collect()
+}
+
+/// 按 ID 取模板场景（解析失败视为内置资源损坏，返回 Err）。
+pub fn load(id: &str) -> Result<Scene, String> {
+    let src = source_of(id).ok_or_else(|| format!("未知模板：{id}"))?;
+    serde_json::from_str(src).map_err(|e| format!("模板 {id} JSON 解析失败：{e}"))
+}
 
 #[cfg(test)]
 mod tests {
@@ -175,9 +195,21 @@ mod tests {
 
         let mut seen_ids = std::collections::HashSet::new();
         for meta in &metas {
-            assert!(seen_ids.insert(meta.id.as_str()), "模板 ID 重复：{}", meta.id);
-            assert!(!meta.name.trim().is_empty(), "模板 {} 名称不能为空", meta.id);
-            assert!(!meta.description.trim().is_empty(), "模板 {} 描述不能为空", meta.id);
+            assert!(
+                seen_ids.insert(meta.id.as_str()),
+                "模板 ID 重复：{}",
+                meta.id
+            );
+            assert!(
+                !meta.name.trim().is_empty(),
+                "模板 {} 名称不能为空",
+                meta.id
+            );
+            assert!(
+                !meta.description.trim().is_empty(),
+                "模板 {} 描述不能为空",
+                meta.id
+            );
             assert!(
                 (0.5..=300.0).contains(&meta.duration_sec),
                 "模板 {} 时长越界：{}",
@@ -194,7 +226,7 @@ mod tests {
             // 缓动值域：反序列化时未知缓动会静默回退 linear，
             // 因此逐条重新解析原始 JSON 校验 easing 字面值。
             let raw: serde_json::Value =
-                serde_json::from_str(TEMPLATE_SOURCES.iter().find(|(tid, _)| *tid == meta.id).unwrap().1)
+                serde_json::from_str(source_of(&meta.id).expect("登记表与来源表应一一对应"))
                     .unwrap();
             for layer in raw["layers"].as_array().unwrap() {
                 for anim in layer["animations"].as_array().unwrap() {
@@ -260,6 +292,17 @@ mod tests {
             // easing 反序列化无损：Easing 是 Copy 的九值枚举，此处确保值域合法
             let _ = Easing::Linear;
         }
+    }
+
+    /// 登记表（ENTRIES）与来源表（SOURCES）应一一对应，防漏登/错位。
+    #[test]
+    fn entries_match_sources() {
+        assert_eq!(ENTRIES.len(), SOURCES.len(), "登记表与来源表长度不一致");
+        for (e, (tid, _)) in ENTRIES.iter().zip(SOURCES.iter()) {
+            assert_eq!(e.id, *tid, "登记表与来源表顺序不一致：{} vs {}", e.id, tid);
+        }
+        let listed = list();
+        assert_eq!(listed.len(), ENTRIES.len(), "list() 不应丢弃任何模板");
     }
 
     /// load() 对未知 ID 应报错而不是 panic。

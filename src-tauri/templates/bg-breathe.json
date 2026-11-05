@@ -6,23 +6,29 @@
   "background": "#0e1017",
   "layers": [
     {
-      "shape": { "kind": "ellipse", "x": 640, "y": 380, "rx": 420, "ry": 260, "fill": "#1a1d33", "opacity": 0.9 },
+      "shape": { "kind": "ellipse", "x": 640, "y": 380, "rx": 480, "ry": 300, "fill": "#161a2e", "opacity": 1, "rotation": 0 },
+      "animations": []
+    },
+    {
+      "shape": { "kind": "ellipse", "x": 640, "y": 380, "rx": 450, "ry": 275, "fill": "#1d2340", "opacity": 1, "rotation": 0 },
       "animations": [
-        { "prop": "rx", "from": 380, "to": 450, "start": 0.0, "end": 2.5, "easing": "easeInOut" },
-        { "prop": "ry", "from": 235, "to": 275, "start": 0.0, "end": 2.5, "easing": "easeInOut" },
-        { "prop": "rx", "from": 450, "to": 380, "start": 2.5, "end": 5.0, "easing": "easeInOut" },
-        { "prop": "ry", "from": 275, "to": 235, "start": 2.5, "end": 5.0, "easing": "easeInOut" }
+        { "prop": "rx", "from": 450, "to": 380, "start": 0.0, "end": 5.0, "easing": "easeInOut" },
+        { "prop": "ry", "from": 275, "to": 235, "start": 0.0, "end": 5.0, "easing": "easeInOut" }
       ]
     },
     {
-      "shape": { "kind": "circle", "x": 640, "y": 380, "r": 150, "fill": "#232848", "opacity": 0.9 },
+      "shape": { "kind": "ellipse", "x": 640, "y": 380, "rx": 380, "ry": 235, "fill": "#1d2340", "opacity": 1, "rotation": 0 },
       "animations": [
-        { "prop": "r", "from": 140, "to": 165, "start": 0.25, "end": 2.4, "easing": "easeInOut" },
-        { "prop": "r", "from": 165, "to": 140, "start": 2.4, "end": 4.6, "easing": "easeInOut" }
+        { "prop": "rx", "from": 380, "to": 450, "start": 0.0, "end": 5.0, "easing": "easeInOut" },
+        { "prop": "ry", "from": 235, "to": 275, "start": 0.0, "end": 5.0, "easing": "easeInOut" }
       ]
     },
     {
-      "shape": { "kind": "text", "x": 640, "y": 360, "text": "呼吸光晕无接缝循环，适合叠加任何前景", "size": 26, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
+      "shape": { "kind": "circle", "x": 640, "y": 380, "r": 150, "fill": "#262c52" },
+      "animations": []
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 360, "text": "双层椭圆反相呼吸、首尾同位无跳变，叠加任何前景都适用", "size": 26, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
       "animations": [
         { "prop": "opacity", "from": 0, "to": 1, "start": 0.3, "end": 1.2, "easing": "easeOutCubic" }
       ]
