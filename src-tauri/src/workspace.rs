@@ -54,13 +54,6 @@ pub fn resolve(app: &AppHandle, rel: &str) -> Result<PathBuf, String> {
     Ok(root(app).join(rel))
 }
 
-fn to_rel(app: &AppHandle, abs: &PathBuf) -> String {
-    abs.strip_prefix(root(app))
-        .unwrap_or(abs)
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
 /// 递归列出工作区文件（跳过隐藏目录），按路径排序。
 pub fn list(app: &AppHandle, subdir: &str) -> Result<Vec<FileEntry>, String> {
     let base = resolve(app, subdir)?;
@@ -159,11 +152,6 @@ pub fn rename(app: &AppHandle, from: &str, to: &str) -> Result<(), String> {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败：{e}"))?;
     }
     fs::rename(&src, &dst).map_err(|e| format!("重命名失败：{from} → {to}（{e}）"))
-}
-
-/// 供显示用的相对路径（去掉工作区前缀）。
-pub fn display_path(app: &AppHandle, abs: &PathBuf) -> String {
-    to_rel(app, abs)
 }
 
 #[cfg(test)]
