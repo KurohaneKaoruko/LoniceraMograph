@@ -1,0 +1,42 @@
+{
+  "name": "标题入场",
+  "durationSec": 6,
+  "width": 1280,
+  "height": 720,
+  "background": "#0e1017",
+  "layers": [
+    {
+      "shape": { "kind": "rect", "x": 40, "y": 40, "w": 56, "h": 6, "fill": "#5a8bff", "radius": 3 },
+      "animations": [
+        { "prop": "w", "from": 0, "to": 56, "start": 0.2, "end": 1.0, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 40, "y": 96, "text": "BRAND / 2026", "size": 20, "fill": "#9aa1b5", "align": "left", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.5, "end": 1.2, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 330, "text": "主标题文字", "size": 88, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.3, "end": 1.3, "easing": "easeOutCubic" },
+        { "prop": "y", "from": 374, "to": 330, "start": 0.3, "end": 1.4, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "rect", "x": 460, "y": 430, "w": 360, "h": 4, "fill": "#7c6cf0", "radius": 2 },
+      "animations": [
+        { "prop": "w", "from": 0, "to": 360, "start": 0.8, "end": 1.9, "easing": "easeOutCubic" },
+        { "prop": "x", "from": 640, "to": 460, "start": 0.8, "end": 1.9, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 500, "text": "这里是副标题或一句话说明", "size": 28, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 1.4, "end": 2.4, "easing": "easeOutCubic" },
+        { "prop": "y", "from": 518, "to": 500, "start": 1.4, "end": 2.5, "easing": "easeOutCubic" }
+      ]
+    }
+  ]
+}

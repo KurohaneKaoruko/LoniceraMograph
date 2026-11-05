@@ -1,0 +1,50 @@
+{
+  "name": "循环背景·漂浮气泡",
+  "durationSec": 6,
+  "width": 1280,
+  "height": 720,
+  "background": "#12141d",
+  "layers": [
+    {
+      "shape": { "kind": "circle", "x": 200, "y": 160, "r": 90, "fill": "#1d2c4f" },
+      "animations": [
+        { "prop": "y", "from": 140, "to": 190, "start": 0.0, "end": 3.0, "easing": "easeInOut" },
+        { "prop": "y", "from": 190, "to": 140, "start": 3.0, "end": 6.0, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "shape": { "kind": "circle", "x": 460, "y": 500, "r": 60, "fill": "#243054" },
+      "animations": [
+        { "prop": "x", "from": 440, "to": 490, "start": 0.5, "end": 3.25, "easing": "easeInOut" },
+        { "prop": "x", "from": 490, "to": 440, "start": 3.25, "end": 6.0, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "shape": { "kind": "circle", "x": 760, "y": 220, "r": 44, "fill": "#32386e" },
+      "animations": [
+        { "prop": "y", "from": 200, "to": 245, "start": 1.0, "end": 3.5, "easing": "easeInOut" },
+        { "prop": "y", "from": 245, "to": 200, "start": 3.5, "end": 6.0, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "shape": { "kind": "circle", "x": 1020, "y": 460, "r": 110, "fill": "#1d2c4f" },
+      "animations": [
+        { "prop": "y", "from": 430, "to": 480, "start": 0.0, "end": 3.0, "easing": "easeInOut" },
+        { "prop": "y", "from": 480, "to": 430, "start": 3.0, "end": 6.0, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "shape": { "kind": "circle", "x": 1160, "y": 130, "r": 34, "fill": "#32386e" },
+      "animations": [
+        { "prop": "x", "from": 1140, "to": 1185, "start": 0.8, "end": 3.4, "easing": "easeInOut" },
+        { "prop": "x", "from": 1185, "to": 1140, "start": 3.4, "end": 6.0, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 360, "text": "把这段垫底，上面叠标题或数据动画", "size": 26, "fill": "#9aa1b5", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.3, "end": 1.2, "easing": "easeOutCubic" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "name": "Logo 描边展示",
+  "durationSec": 6,
+  "width": 1280,
+  "height": 720,
+  "background": "#0e1017",
+  "layers": [
+    {
+      "shape": { "kind": "path", "d": "M 560 320 L 640 250 L 720 320 L 640 390 Z", "fill": "#0e1017", "stroke": "#5a8bff", "strokeWidth": 3 },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 0.2, "end": 0.8, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "path", "d": "M 560 320 L 640 250 L 720 320 L 640 390 Z", "fill": "#5a8bff", "stroke": "#5a8bff", "strokeWidth": 3 },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 1.2, "end": 2.0, "easing": "easeInOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "rect", "x": 617, "y": 440, "w": 46, "h": 4, "fill": "#5a8bff", "radius": 2 },
+      "animations": [
+        { "prop": "w", "from": 0, "to": 46, "start": 1.6, "end": 2.4, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 500, "text": "YOUR BRAND", "size": 44, "fill": "#e8eaf2", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 2.2, "end": 3.0, "easing": "easeOutCubic" },
+        { "prop": "y", "from": 516, "to": 500, "start": 2.2, "end": 3.1, "easing": "easeOutCubic" }
+      ]
+    },
+    {
+      "shape": { "kind": "text", "x": 640, "y": 556, "text": "描边勾勒 → 填充浮现 → 品牌名入场", "size": 20, "fill": "#6b7288", "align": "center", "baseline": "middle" },
+      "animations": [
+        { "prop": "opacity", "from": 0, "to": 1, "start": 3.2, "end": 4.0, "easing": "easeOutCubic" }
+      ]
+    }
+  ]
+}
