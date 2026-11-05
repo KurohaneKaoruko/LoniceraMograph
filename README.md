@@ -6,17 +6,17 @@ AI Agent 驱动的 MG（Motion Graphics）动画创作工具。**视频实时预
 
 ## 功能
 
-- 🎬 **实时预览**：Canvas 渲染 + requestAnimationFrame 播放循环，播放/暂停/进度条拖拽 scrub
+- 🎬 **实时预览**：Canvas 渲染 + requestAnimationFrame 播放循环，播放/暂停/进度条拖拽 scrub；渲染异常显式提示并自动回退上一可用场景，不会黑屏定格
 - 🤖 **Agent 能力**：AI 通过 function calling 操控工作区文件——
   - `list_files` / `read_file` / `write_file` / `delete_file` / `rename_file`
   - `load_scene` 加载场景 JSON 到预览；`compile_script` 执行 JS 脚本生成场景
   - `get_scene_errors` 场景体检（越界、空图层、不支持属性、描边过粗…），`get_scene` 读取当前场景
-  - 多步循环（上限 12 步）：写文件 → 加载预览 → 自查 → 修复，工具活动实时展示在聊天中；`get_scene` / `get_scene_errors` 跨步骤可见（写 → 查 → 改的完整闭环）
+  - 多步循环（上限 12 步）：写文件 → 加载预览 → 自查 → 修复，工具活动实时展示在聊天中（失败标红并附原因）；`get_scene` / `get_scene_errors` 跨步骤可见（写 → 查 → 改的完整闭环）
 - 📁 **工作区**：`~/文档/LoniceraMograph/`（无文档目录时回退应用数据目录），`scenes/*.json` + `scripts/*.js`；预览区右上角文件面板可点击打开
 - ⚙️ **JS 脚本生成动画**：脚本跑在沙箱中（Node `--permission` / 其他引擎），提供 `scene()` / `text()` / `anim()` 等辅助函数，适合程序化粒子、波浪、随机布局；脚本输出量不受管道缓冲区限制（读取走独立线程，不会误报超时）
 - 🎨 **图元属性**：6 种图形（rect / circle / ellipse / line / text / path），填充 + 描边（`stroke` / `strokeWidth`）、旋转（`rotation`，path 以包围盒中心、text 以锚点为原点）、透明度均可补间
 - 💬 **多 Provider**：Mock（离线演示）/ OpenAI 兼容 / Anthropic / Ollama，流式输出
-- ⬇️ **一键导出**：自动播放一遍并录制为 WebM（VP9，1280×720），气泡内实时显示进度，保存到系统下载目录
+- ⬇️ **一键导出**：自动播放一遍并录制为 WebM（优先 VP9、不支持时回退 VP8/默认编码，分辨率随画布尺寸），气泡内实时显示进度，保存到系统下载目录
 
 ## 架构
 
@@ -28,7 +28,7 @@ AI Agent 驱动的 MG（Motion Graphics）动画创作工具。**视频实时预
                 ├──► script 沙箱（执行 JS → 场景）
                 ├──► Scene::evaluate(t)（每帧求值）
                 ▼
-          事件流 ──► 前端：delta / tool / filesChanged / scene / done
+          事件流 ──► 前端：delta / tool / filesChanged / scene / error / done
 ```
 
 - **场景即数据**：声明式 JSON（图层 + 补间动画），或由 JS 脚本程序化生成
@@ -64,6 +64,9 @@ npm run build        # 前端类型检查 + Vite 构建产物（Tauri 打包时�
 | `renderer.ts`       | Canvas 光栅化：消费 Rust 下发的 DrawCmd |
 | `types.ts`          | 与 Rust 结构对应的事件/数据类型 |
 | `sceneValidate.ts`  | 场景元信息护栏（纯函数，含单元测试） |
+| `drawSanitize.ts`   | 绘制指令护栏：光栅化前把异常数值收敛到安全范围（含单元测试） |
+| `renderGuard.ts`    | 渲染失败决策：连续失败回退上一可用场景（含单元测试） |
+| `toolActivity.ts`   | 工具活动行展示：失败红标与 ✗ 前缀（含单元测试） |
 
 测试：`cd src-tauri && cargo test`（场景求值、JSON 提取、脚本沙箱、路径安全、场景体检…）；前端 `npm test`。
 
